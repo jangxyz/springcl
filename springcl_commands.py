@@ -1,5 +1,6 @@
 from optparse import OptionParser
 import springnote
+import filesystem_service
 
 class Option:
     def __init__(self, **options):
@@ -195,9 +196,10 @@ class ReadCommand(SpringclCommand):
         #parser.add_option('--page', metavar='PAGE_ID', action=)
 
         # local/remote
-        parser.add_option('--local',  action="store_true", dest="run_local", help="always fetch resource locally")
-        parser.add_option('--remote', action="store_true", dest="run_remote", help="always fetch resource remotely")
-        parser.add_option('--remote-local', action="store_true", dest="run_local_on_fail", default=False, help="use local cache only if fetching from remote fails")
+        parser.add_option('--local',  action="store_true", dest="run_remote_on_fail", default=False, help="local first, remote only when failed")
+        parser.add_option('--remote', action="store_true", dest="run_local_on_fail",  default=False, help="remote first, local only when failed")
+        parser.add_option('--remote-only', action="store_true", dest="run_remote", default=False, help="always fetch resource remotely")
+        parser.add_option('--local-only',  action="store_true", dest="run_local",  default=False, help="always fetch resource locally")
 
         # auth
         parser.add_option('--auth',     metavar="TOKEN")
@@ -211,12 +213,11 @@ class ReadCommand(SpringclCommand):
         options, args = self.build_parser().parse_args(opt_list)
 
         options.args = args
-        # handle run_local/run_remote/run_local_on_fail
-        if options.run_remote:  options.run_local  = False 
-        if options.run_local:   options.run_remote = False 
-        if options.run_local_on_fail:   
-            options.run_local  = False 
-            options.run_remote = True
+        # handle run_local/run_remote/run_local_on_fail/run_remote_on_fail
+        if   options.run_remote_on_fail: options.run_local  = True # local
+        elif options.run_local_on_fail:  options.run_remote = True # remote
+        elif options.run_remote:         pass                      # remote-only
+        elif options.run_local:          pass                      # local-only
 
         return options
 
@@ -251,12 +252,17 @@ class ReadCommand(SpringclCommand):
     def get_page(self, id, options, note=None):
         ''' fetch page '''
         run_command_with = lambda sn: sn.get_page(id=id, note=note)
+        # first try
         try:
             result = run_command_with(self.sn(options))
-        except springnote.SpringnoteError.Base, e:
-            if options.run_local_on_fail:
-                print e, ', trying local'
-                result = run_command_with(self.sn_local)
+            sn = None
+        except springcl.filesystem_service.FileNotExist, e:
+            sn = self.sn_remote if options.run_remote_on_fail else None
+        except springnote.SpringnoteError.NoNetwork, e:
+            sn = self.sn_local  if options.run_local_on_fail else None
+        # second try
+        if sn:
+            result = run_command_with(sn)
         return result
 
     def get_revision(self, page, rev):

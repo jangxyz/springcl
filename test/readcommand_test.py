@@ -22,30 +22,38 @@ class OptionTestCase(TestCase):
         return ReadCommand(opt_list).options
 
 class LocalRemoteOptionTestCase(OptionTestCase):
-    def test_remote_option_sets_run__remote_to_true(self):
+    def test_remote_option_sets_run__remote_and_run__local__on__fail_to_true(self):
         options = self.get_options(_w("--remote 123"))
         # verify
-        assert_that(options.run_remote, is_(True))
-        assert_that(options.run_local,  is_(False))
+        assert_that(options.run_remote       , is_(True))
+        assert_that(options.run_local_on_fail, is_(True))
+        assert_that(options.run_local         , is_(False))
+        assert_that(options.run_remote_on_fail, is_(False))
 
     def test_local_option_sets_run__local_to_true(self):
         options = self.get_options(_w("--local 123"))
         #
-        assert_that(options.run_remote, is_(False))
-        assert_that(options.run_local,  is_(True))
+        assert_that(options.run_local         , is_(True))
+        assert_that(options.run_remote_on_fail, is_(True))
+        assert_that(options.run_remote       , is_(False))
+        assert_that(options.run_local_on_fail, is_(False))
 
-    def test_remote_local_option_runs_remote_first_and_local_only_if_fail(self):
-        options = self.get_options(_w("--remote-local 123"))
+    def test_remote_only_option_runs_only_remote_first(self):
+        options = self.get_options(_w("--remote-only 123"))
         # verify
-        assert_that(options.run_remote,        is_(True))
-        assert_that(options.run_local,         is_(False))
-        assert_that(options.run_local_on_fail, is_(True))
+        assert_that(options.run_remote       , is_(True))
+        assert_that(options.run_local_on_fail, is_(False))
+        assert_that(options.run_local         , is_(False))
+        assert_that(options.run_remote_on_fail, is_(False))
 
-    def test_remote_or_local_alone_does_not_set_run_local_on_fail(self):
-        def run_local_on_fail_option_with(opt_str):
-            return self.get_options(_w(opt_str)).run_local_on_fail
-        assert_that(run_local_on_fail_option_with("--local 123"),  is_(False))
-        assert_that(run_local_on_fail_option_with("--remote 123"), is_(False))
+    def test_local_only_option_runs_only_remote_first(self):
+        options = self.get_options(_w("--local-only 123"))
+        # verify
+        assert_that(options.run_local         , is_(True))
+        assert_that(options.run_remote_on_fail, is_(False))
+        assert_that(options.run_remote       , is_(False))
+        assert_that(options.run_local_on_fail, is_(False))
+
 
 class TitleIdOptionTestCase(OptionTestCase):
     def test_title_option_force_is__title_to_true(self):
@@ -79,7 +87,15 @@ class RevOptionTestCase(OptionTestCase):
 
 
 class FetchPageLocalRemoteTestCase(TestCase):
-    ''' test case for fetching resource from local, remote, or remote-then-local scenario '''
+    ''' test case for fetching resource from either local or remote, depending 
+    on the precedence option.
+
+    options:
+     * run_local
+     * run_remote
+     * run_local_on_fail
+     * run_remote_on_fail
+    '''
     def setUp(self): 
         self.get_page_remote_expected = mock_on(ReadCommand.sn_remote).get_page.is_expected
         self.get_page_local_expected  = mock_on(ReadCommand.sn_local).get_page.is_expected
@@ -89,34 +105,42 @@ class FetchPageLocalRemoteTestCase(TestCase):
     def stub_parse(self, **new_options):
         options = { # default
             'is_title': False, 'is_id': False,
-            'args': [], 'note': None,
+            'args': [123], 'note': None,
             'rev': None,
         }
         options.update(new_options)
+        if options.get('run_local'):   options['run_remote'] = False
+        if options.get('run_remote'):  options['run_local']  = False
         option_mock = mock('option').with_children(**options).raw
         mock_on(ReadCommand).parse.is_expected.returning(option_mock)
     
+    def test_access_locally_with_local_option(self):
+        self.stub_parse(run_local=True)
+
+        # only LOCAL should be called
+        self.get_page_local_expected.once()
+        self.get_page_remote_expected.no_times()
+        ReadCommand().run()
+
+    def test_access_remote_after_local_if_not_found(self):
+        self.stub_parse(run_local=True, run_remote_on_fail=True)
+
+        # run LOCAL, and REMOTE if not found in local
+        exception = springcl_commands.filesystem_service.FileNotExist('no such file')
+        self.get_page_local_expected.once().raising(exception)
+        self.get_page_remote_expected.once()
+        ReadCommand().run()
+
     def test_access_remotely_with_remote_option(self):
-        self.stub_parse(run_remote=True, run_local=False, args=[123])
+        self.stub_parse(run_remote=True)
+
         # only REMOTE should be called
         self.get_page_remote_expected.once()
         self.get_page_local_expected.no_times()
         ReadCommand().run()
 
-    def test_access_locally_with_local_option(self):
-        self.stub_parse(run_remote=False, run_local=True, args=[123])
-
-        # only LOCAL should be called
-        self.get_page_remote_expected.no_times()
-        self.get_page_local_expected.once()
-        ReadCommand().run()
-
     def test_access_remotely_then_locally_if_failed_given_remote_local_option(self):
-        self.stub_parse(
-            run_remote=True, 
-            run_local=False, 
-            run_local_on_fail=True, 
-            args=[123])
+        self.stub_parse(run_remote=True, run_local_on_fail=True)
 
         # call LOCAL if REMOTE fails
         exception = springcl_commands.springnote.SpringnoteError.NoNetwork('no network')
