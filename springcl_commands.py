@@ -188,7 +188,7 @@ class ReadCommand(SpringclCommand):
         parser.add_option('--format')
 
         # 
-        parser.add_option('--rev', type="int", metavar='ID')
+        parser.add_option('--rev', metavar='ID')
         # resource type
         parser.add_option('--comment', action="store_true", dest="is_comment")
         parser.add_option('--path',    action="store_true", dest="is_path")
@@ -212,10 +212,10 @@ class ReadCommand(SpringclCommand):
 
         options.args = args
         # handle run_local/run_remote/run_local_on_fail
-        if options.run_remote:    options.run_local  = False 
-        if options.run_local:     options.run_remote = False 
+        if options.run_remote:  options.run_local  = False 
+        if options.run_local:   options.run_remote = False 
         if options.run_local_on_fail:   
-            options.run_local    = False 
+            options.run_local  = False 
             options.run_remote = True
 
         return options
@@ -248,19 +248,35 @@ class ReadCommand(SpringclCommand):
             resource_id = pages[0].id
         return resource_id
 
-    def run(self):
-        opt = self.options
-        sn = self.sn(opt)
-
-        # run 
-        resource_id = self.find_resource_id(opt.args[0], opt)
-        run_command_with = lambda sn: sn.get_page(id=resource_id, note=opt.note)
+    def get_page(self, id, options, note=None):
+        ''' fetch page '''
+        run_command_with = lambda sn: sn.get_page(id=id, note=note)
         try:
-            result = run_command_with(sn)
+            result = run_command_with(self.sn(options))
         except springnote.SpringnoteError.Base, e:
-            if opt.run_local_on_fail:
+            if options.run_local_on_fail:
                 print e, ', trying local'
                 result = run_command_with(self.sn_local)
+        return result
+
+    def get_revision(self, page, rev):
+        ''' fetch revision '''
+        if rev:
+            if rev[0] in ('-', '+'):    key = 'index'
+            else:                       key = 'id'
+            page = page.get_revision(**{key: rev})
+        return page
+
+
+    def run(self):
+        opt = self.options
+        # run 
+        resource_id = self.find_resource_id(opt.args[0], opt)
+        page = self.get_page(id=resource_id, note=opt.note, options=opt)
+        if opt.rev:
+            page = self.get_revision(page, opt.rev)
+        return page
+            
 
     def format(self, **options):
         pass

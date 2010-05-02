@@ -60,7 +60,7 @@ class TitleIdOptionTestCase(OptionTestCase):
         assert_that(options.is_title, is_(False))
 
 class NoteOptionTestCase(OptionTestCase):
-    def test_note_option_sets_note(self):
+    def test_note_option_sets_note_name(self):
         options = self.get_options(_w("--note jangxyz a123"))
         assert_that(options.note, is_('jangxyz'))
         assert_that(options.args, is_(_w('a123')))
@@ -68,6 +68,14 @@ class NoteOptionTestCase(OptionTestCase):
     def test_note_option_defaults_to_none(self):
         options = self.get_options(_w("a123"))
         assert_that(options.note, is_(None))
+
+class RevOptionTestCase(OptionTestCase):
+    def test_rev_option_sets_rev_as_string(self):
+        def rev_option_with(opt_str):
+            return self.get_options(_w(opt_str)).rev
+        assert_that(rev_option_with("--rev  1"), is_( '1')) #  1 differs with
+        assert_that(rev_option_with("--rev +1"), is_('+1')) # +1
+        assert_that(rev_option_with("--rev -1"), is_('-1'))
 
 
 class FetchPageLocalRemoteTestCase(TestCase):
@@ -80,10 +88,9 @@ class FetchPageLocalRemoteTestCase(TestCase):
 
     def stub_parse(self, **new_options):
         options = { # default
-            'is_title': False,
-            'is_id': False,
-            'args': [], 
-            'note': None,
+            'is_title': False, 'is_id': False,
+            'args': [], 'note': None,
+            'rev': None,
         }
         options.update(new_options)
         option_mock = mock('option').with_children(**options).raw
@@ -125,10 +132,9 @@ class FetchPageConvertTitleToIdTestCase(TestCase):
 
     def stub_parse(self, **new_options):
         options = { # default
-            'args': [], 
-            'run_local': True,
-            'run_remote': False, 
-            'note': None,
+            'run_local': True, 'run_remote': False, 
+            'args': [], 'note': None,
+            'rev': None,
         }
         options.update(new_options)
         option_mock = mock('option').with_children(**options).raw
@@ -204,6 +210,7 @@ class FetchPageWithNoteTestCase(TestCase):
         options = { # default
             'is_title':  False, 'is_id': False,
             'run_local': True,  'run_remote': False,
+            'rev': None,
         }
         options.update(new_options)
         option_mock = mock('option').with_children(**options).raw
@@ -226,6 +233,59 @@ class FetchPageWithNoteTestCase(TestCase):
         # run
         ReadCommand().run()
 
+
+class FetchPageWithRevisionTestCase(TestCase):
+    def setUp(self):
+        self.sn = mock_on(ReadCommand.sn_local)
+
+    def stub_parse(self, **new_options):
+        options = { # default
+            'is_title': False, 'is_id': False,
+            'run_local': True, 'run_remote': False,
+            'args': [], 'note': None,
+        }
+        options.update(new_options)
+        option_mock = mock('option').with_children(**options).raw
+        mock_on(ReadCommand).parse.is_expected.returning(option_mock)
+
+    def test_numeric_rev_option_fetches_page_revision_with_id(self):
+        id, rev_id = (123, '456')
+        #
+        self.stub_parse(rev=rev_id, args=[id])
+
+        page_get_revision = mock('page.get_revision')
+        page = mock('page').with_children(get_revision=page_get_revision.raw).raw
+        self.sn.get_page.is_expected.returning(page)
+        page_get_revision.is_expected.with_args(id=rev_id)
+
+        # run
+        ReadCommand().run()
+
+    def test_plus_signed_rev_option_fetches_page_revision_with_index(self):
+        id, rev_idx = (123, '+3')
+        # 
+        self.stub_parse(rev=rev_idx, args=[id])
+
+        page_get_revision = mock('page.get_revision')
+        page = mock('page').with_children(get_revision=page_get_revision.raw).raw
+        self.sn.get_page.is_expected.returning(page)
+        page_get_revision.is_expected.with_args(index=rev_idx)
+
+        # run
+        ReadCommand().run()
+
+    def test_minus_signed_rev_option_fetches_page_revision_with_index(self):
+        id, rev_idx = (123, '-2')
+        # 
+        self.stub_parse(rev=rev_idx, args=[id])
+
+        page_get_revision = mock('page.get_revision')
+        page = mock('page').with_children(get_revision=page_get_revision.raw).raw
+        self.sn.get_page.is_expected.returning(page)
+        page_get_revision.is_expected.with_args(index=rev_idx)
+
+        # run
+        ReadCommand().run()
 
 
 if __name__ == '__main__':
