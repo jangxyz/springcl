@@ -161,8 +161,9 @@ class ResourcePointer:
 import springcl
 
 class SpringclCommand:
-    sn_remote = springcl.make_sn()
-    sn_local  = springcl.make_sn(local=True)
+    _sn = None
+    _remote_service = springnote.HttpRequestService()
+    _local_service  = filesystem_service.FileSystemService(springcl.BASE_PATH)
 
 class ReadCommand(SpringclCommand):
     ''' read resource, either from local file system or springnote.com.
@@ -175,7 +176,7 @@ class ReadCommand(SpringclCommand):
      * springcl read --path [--note NOTE] [--title/--id] RESOURCE
     '''
     def __init__(self, opt_str=''):
-        self.options = self.parse(opt_str)
+        self.options = self.parse(opt_str.split())
 
     @classmethod
     def build_parser(cls):
@@ -221,8 +222,12 @@ class ReadCommand(SpringclCommand):
 
         return options
 
-    def sn(self, option):
-        return self.sn_remote if option.run_remote else self.sn_local
+    def sn(self, option, service=None):
+        self._sn = self._sn or springcl.make_sn()
+        new_service = self._remote_service if option.run_remote else self._local_service
+        service = service or new_service
+        self._sn.service = service
+        return self._sn
 
     def find_resource_id(self, arg, options):
         ''' find resource id from given arg and options 
@@ -243,45 +248,73 @@ class ReadCommand(SpringclCommand):
 
         if options.is_title:
             # find single resource titled `arg`
-            pages = self.sn(options).list_pages(note=options.note, title=arg)
+            sn    = self.sn(options)
+            pages = springnote.Page.list(sn, note=options.note, title=arg)
             if   len(pages) == 0: raise springcl.NoSuchResource("no page found with title '%s'. try `list` command" % arg)
             elif len(pages) >  1: raise springcl.DuplicateResources("more than one pages found with title '%s'. try `list` command" % arg)
             resource_id = pages[0].id
         return resource_id
 
-    def get_page(self, id, options, note=None):
-        ''' fetch page '''
-        run_command_with = lambda sn: sn.get_page(id=id, note=note)
-        # first try
+    def try_fetch(self, fetch_method, options):
+        ''' try fetching resource from local, remote or both, following options '''
+        # try
         try:
-            result = run_command_with(self.sn(options))
+            result = fetch_method(sn=self.sn(options))
             sn = None
         except springcl.filesystem_service.FileNotExist, e:
-            sn = self.sn_remote if options.run_remote_on_fail else None
+            sn = None
+            if options.run_remote_on_fail:
+                sn = self.sn(options, service=self._remote_service)
+            else:
+                raise e
         except springnote.SpringnoteError.NoNetwork, e:
-            sn = self.sn_local  if options.run_local_on_fail else None
-        # second try
+            if options.run_local_on_fail:
+                sn = self.sn(options, service=self._local_service)
+            else:
+                raise e
+        # retry
         if sn:
-            result = run_command_with(sn)
+            result = fetch_method(sn=sn)
         return result
 
-    def get_revision(self, page, rev):
-        ''' fetch revision '''
-        if rev:
-            if rev[0] in ('-', '+'):    key = 'index'
-            else:                       key = 'id'
-            page = page.get_revision(**{key: rev})
-        return page
+    def run_get_page(self, id, note=None, rev=None, options=None):
+        ''' fetch a page with specific id, note and revision, with options '''
+        def fetch_page_with_rev(sn):
+            # fetch page
+            #page = sn.get_page(id=id, note=note)
+            page = springnote.Page(sn, id=id, note=note).get()
+            # get rev if given
+            if rev:
+                if rev[0] in ('-', '+'):    key = 'index'
+                else:                       key = 'id'
+                page = page.get_revision(**{key: rev})
+            return page
+
+        return self.try_fetch(fetch_method=fetch_page_with_rev, options=options)
+
+    #def get_revision(self, page, rev):
+    #    ''' fetch revision of a page '''
+    #    if rev:
+    #        if rev[0] in ('-', '+'):    key = 'index'
+    #        else:                       key = 'id'
+    #        page = page.get_revision(**{key: rev})
+    #    return page
+
+    def run_list_comments(self, id, note=None, options=None):
+        ''' fetch comments of the page '''
+        fetch_page_comments = lambda sn: springnote.Page(sn, id=id, note=note).list_comments()
+        return self.try_fetch(fetch_page_comments, options)
 
 
     def run(self):
         opt = self.options
         # run 
         resource_id = self.find_resource_id(opt.args[0], opt)
-        page = self.get_page(id=resource_id, note=opt.note, options=opt)
-        if opt.rev:
-            page = self.get_revision(page, opt.rev)
-        return page
+        if opt.is_comment:
+            result = self.run_list_comments(id=resource_id, note=opt.note, options=opt)
+        else:
+            result = self.run_get_page(id=resource_id, note=opt.note, rev=opt.rev, options=opt)
+        return result
             
 
     def format(self, **options):
