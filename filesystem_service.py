@@ -9,6 +9,7 @@
 
 """
 import urllib, httplib, os
+BASE_PATH = "~/.springcl"
 
 class FileNotExist(Exception): pass
 

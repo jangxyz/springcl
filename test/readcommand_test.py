@@ -3,15 +3,20 @@
     Springcl Read Command Test
 '''
 
+# testing modules
 import unittest_decorator_patch as unittest
 from hamcrest import *
 from mocktest import *
 import sys, os; sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
+import types
 
+# springcl
 import springcl, springcl_commands
 from springcl_commands import ReadCommand
+from springcl_commands import Errors as error
 from springcl import springnote
 
+# services
 from filesystem_service import FileSystemService, FileNotExist
 from springnote import HttpRequestService
 
@@ -55,10 +60,12 @@ def should_expect_page_get(returns=None, *args, **kwargs):
 
 class OptionTestCase(TestCase):
     def get_options(self, opt_list):
+        if isinstance(opt_list, types.StringTypes):
+            opt_list = opt_list.split()
         return ReadCommand(opt_list).options
 
 class LocalRemoteOptionTestCase(OptionTestCase):
-    def test_remote_option_sets_run__remote_and_run__local__on__fail_to_true(self):
+    def test_remote_option_sets__run_remote__and__run_local_on_fail__to_true(self):
         options = self.get_options("--remote 123")
         # verify
         assert_that(options.run_remote       , is_(True))
@@ -66,7 +73,7 @@ class LocalRemoteOptionTestCase(OptionTestCase):
         assert_that(options.run_local         , is_(False))
         assert_that(options.run_remote_on_fail, is_(False))
 
-    def test_local_option_sets_run__local_to_true(self):
+    def test_local_option_sets__run_local__to_true(self):
         options = self.get_options("--local 123")
         #
         assert_that(options.run_local         , is_(True))
@@ -122,20 +129,24 @@ class RevOptionTestCase(OptionTestCase):
         assert_that(rev_option_with("--rev -1"), is_('-1'))
 
 class LoadSn(TestCase):
+    def run_command(self):
+        ReadCommand(['123']).run()
+
     def test_loads_sn(self):
         class StopTest(Exception): pass
 
         mock_on(springnote).Springnote.is_expected.raising(StopTest)
-        self.assertRaises(StopTest, lambda: ReadCommand('123').run())
+        self.assertRaises(StopTest, lambda: self.run_command())
 
     def test_calls_Page_with_sn(self):
         sn_is_first_arg = lambda *args, **kw: isinstance(args[0], springnote.Springnote)
         mock_on(springnote).Page.is_expected.where_(sn_is_first_arg).once()
-        ReadCommand('123').run()
+        self.run_command()
 
     def test_page_calls_get(self):
         mock_on(springnote.Page).get.is_expected.once()
-        ReadCommand('123').run()
+        self.run_command()
+
         
 
 
@@ -284,10 +295,9 @@ class FetchPageConvertTitleToIdTestCase(TestCase):
         mock_on(springnote).Page.is_expected.no_times()
 
         # run
-        self.failUnlessRaises(springcl.DuplicateResources,
-            lambda: ReadCommand().run())
+        self.failUnlessRaises(error.DuplicateResources, lambda: ReadCommand().run())
 
-    def test_is_title_option_raises_error_if_no_page_is_found(self):
+    def test_is_title__option_raises_error_if_no_page_is_found(self):
         title = "some title"
         pages = []
 
@@ -297,8 +307,7 @@ class FetchPageConvertTitleToIdTestCase(TestCase):
         mock_on(springnote).Page.is_expected.no_times()
 
         # run
-        self.failUnlessRaises(springcl.NoSuchResource,
-            lambda: ReadCommand().run())
+        self.failUnlessRaises(error.NoSuchResource, lambda: ReadCommand().run())
 
     def test_is_id_option_raises_error_if_arg_is_not_numeric(self):
         title = "a123"
@@ -307,8 +316,7 @@ class FetchPageConvertTitleToIdTestCase(TestCase):
         mock_on(springnote).Page.is_expected.no_times() # exception will raise
 
         # run
-        self.failUnlessRaises(springcl.OptionError,
-            lambda: ReadCommand().run())
+        self.failUnlessRaises(error.OptionError, lambda: ReadCommand().run())
 
     def test_assumes_numeric_as_id_by_default(self):
         arg = "123"

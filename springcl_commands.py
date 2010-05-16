@@ -2,6 +2,12 @@ from optparse import OptionParser
 import springnote
 import filesystem_service
 
+class Errors:
+    class DuplicateResources(Exception): pass
+    class NoSuchResource(Exception)    : pass
+    class OptionError(Exception)       : pass
+
+## dep.
 class Option:
     def __init__(self, **options):
         for key,value in options.iteritems():
@@ -158,12 +164,14 @@ class ResourcePointer:
 #
 # springcl commands
 #
-import springcl
+
+def make_sn(service=None):
+    return springnote.Springnote(service=service)
 
 class SpringclCommand:
     _sn = None
     _remote_service = springnote.HttpRequestService()
-    _local_service  = filesystem_service.FileSystemService(springcl.BASE_PATH)
+    _local_service  = filesystem_service.FileSystemService(filesystem_service.BASE_PATH)
 
 class ReadCommand(SpringclCommand):
     ''' read resource, either from local file system or springnote.com.
@@ -175,8 +183,8 @@ class ReadCommand(SpringclCommand):
      * springcl read --comment [--note NOTE] [--title/--id] RESOURCE
      * springcl read --path [--note NOTE] [--title/--id] RESOURCE
     '''
-    def __init__(self, opt_str=''):
-        self.options = self.parse(opt_str.split())
+    def __init__(self, opt_list=''):
+        self.options = self.parse(opt_list)
 
     @classmethod
     def build_parser(cls):
@@ -185,7 +193,6 @@ class ReadCommand(SpringclCommand):
         # resource pointer type
         parser.add_option('--title', action="store_true", dest="is_title", default=False)
         parser.add_option('--id',    action="store_true", dest="is_id",    default=False)
-
 
         parser.add_option('--format')
 
@@ -223,7 +230,7 @@ class ReadCommand(SpringclCommand):
         return options
 
     def sn(self, option, service=None):
-        self._sn = self._sn or springcl.make_sn()
+        self._sn = self._sn or make_sn()
         new_service = self._remote_service if option.run_remote else self._local_service
         service = service or new_service
         self._sn.service = service
@@ -243,15 +250,15 @@ class ReadCommand(SpringclCommand):
                 resource_id = int(arg)
             except ValueError:
                 if options.is_id:
-                    raise springcl.OptionError("%s is not an id" % arg)
+                    raise Errors.OptionError("%s is not an id" % arg)
                 options.is_title = True
 
         if options.is_title:
             # find single resource titled `arg`
             sn    = self.sn(options)
             pages = springnote.Page.list(sn, note=options.note, title=arg)
-            if   len(pages) == 0: raise springcl.NoSuchResource("no page found with title '%s'. try `list` command" % arg)
-            elif len(pages) >  1: raise springcl.DuplicateResources("more than one pages found with title '%s'. try `list` command" % arg)
+            if   len(pages) == 0: raise Errors.NoSuchResource("no page found with title '%s'. try `list` command" % arg)
+            elif len(pages) >  1: raise Errors.DuplicateResources("more than one pages found with title '%s'. try `list` command" % arg)
             resource_id = pages[0].id
         return resource_id
 
@@ -261,7 +268,7 @@ class ReadCommand(SpringclCommand):
         try:
             result = fetch_method(sn=self.sn(options))
             sn = None
-        except springcl.filesystem_service.FileNotExist, e:
+        except filesystem_service.FileNotExist, e:
             sn = None
             if options.run_remote_on_fail:
                 sn = self.sn(options, service=self._remote_service)
