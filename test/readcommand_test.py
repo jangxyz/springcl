@@ -58,10 +58,21 @@ def should_expect_page_get(returns=None, *args, **kwargs):
         .returning(page_instance.raw)
     return mock_on(springnote).Page
 
+default_options = {
+    'is_title': False, 'is_id': False,
+    'run_local': True, 'run_remote': False, 
+    'args': [123], 'note': None,
+    'rev': None,
+    'is_comment': False,
+    'basedir': None,
+    'output': '/dev/null',
+}
+
 class OptionTestCase(TestCase):
     def get_options(self, opt_list):
         if isinstance(opt_list, types.StringTypes):
             opt_list = opt_list.split()
+
         return ReadCommand(opt_list).options
 
 class LocalRemoteOptionTestCase(OptionTestCase):
@@ -123,13 +134,28 @@ class NoteOptionTestCase(OptionTestCase):
 class RevOptionTestCase(OptionTestCase):
     def test_rev_option_sets_rev_as_string(self):
         def rev_option_with(opt_str):
-            return self.get_options(opt_str).rev
+            return self.get_options(opt_str + " 563954").rev
         assert_that(rev_option_with("--rev  1"), is_( '1')) #  1 differs with
         assert_that(rev_option_with("--rev +1"), is_('+1')) # +1
         assert_that(rev_option_with("--rev -1"), is_('-1'))
 
+class OutputOptionTestCase(OptionTestCase):
+    def test_output_option_sets_output_file(self):
+        options = self.get_options("--output result.out 563954")
+        assert_that(options.output, is_('result.out'))
+
+    def test_output_option_defaults_to_none(self):
+        options = self.get_options("563954")
+        assert_that(options.output, is_(None))
+
+
+
 class LoadSn(TestCase):
+    def setUp(self):
+        self.page = mock('page').with_children(raw='RAW').raw
+
     def run_command(self):
+        mock_on(ReadCommand).format.returning('RAW') # stub out format
         ReadCommand(['123']).run()
 
     def test_loads_sn(self):
@@ -147,7 +173,6 @@ class LoadSn(TestCase):
         mock_on(springnote.Page).get.is_expected.once()
         self.run_command()
 
-        
 
 
 class FetchPageLocalRemoteTestCase(TestCase):
@@ -160,16 +185,14 @@ class FetchPageLocalRemoteTestCase(TestCase):
      * run_local_on_fail
      * run_remote_on_fail
     '''
-    def setUp(self): 
-        pass
+    def run_command(self, text='RAW'):
+        mock_on(ReadCommand).format.returning(text)
+        ReadCommand().run()
 
     def stub_parse(self, **new_options):
-        options = { # default
-            'is_title': False, 'is_id': False,
-            'args': [123], 'note': None,
-            'rev': None,
-            'is_comment': False,
-        }
+        options = default_options.copy()
+        options.pop('run_local')
+        options.pop('run_remote')
         options.update(new_options)
         if options.get('run_local'):   options['run_remote'] = False
         if options.get('run_remote'):  options['run_local']  = False
@@ -183,7 +206,7 @@ class FetchPageLocalRemoteTestCase(TestCase):
         sn_has_local_service = lambda *args, **kw: is_local_service(args[0].service)
         mock_on(springnote).Page.is_expected.once().where_(sn_has_local_service)
 
-        ReadCommand().run()
+        self.run_command()
 
     def test_access_remote_after_local_if_not_found(self):
         self.stub_parse(run_local=True, run_remote_on_fail=True)
@@ -212,7 +235,7 @@ class FetchPageLocalRemoteTestCase(TestCase):
             .where_(sn_has_local_then_remote_service)   \
             .with_action(raise_exception_only_at_local)
 
-        ReadCommand().run()
+        self.run_command()
 
     def test_access_remotely_with_remote_option(self):
         self.stub_parse(run_remote=True)
@@ -221,7 +244,7 @@ class FetchPageLocalRemoteTestCase(TestCase):
         sn_has_remote_service = lambda *args, **kw: is_remote_service(args[0].service)
         mock_on(springnote).Page.is_expected.once().where_(sn_has_remote_service)
 
-        ReadCommand().run()
+        self.run_command()
 
     def test_get_page_remotely_then_locally_if_failed_given_remote_local_option(self):
         self.stub_parse(run_remote=True, run_local_on_fail=True)
@@ -251,18 +274,18 @@ class FetchPageLocalRemoteTestCase(TestCase):
             .where_(sn_has_remote_then_local_service) \
             .with_action(raise_exception_only_at_remote)
 
-        ReadCommand().run()
+        self.run_command()
+
 
 class FetchPageConvertTitleToIdTestCase(TestCase):
     ''' test case for converting given title into id '''
+    def run_command(self, text='RAW'):
+        mock_on(ReadCommand).format.returning(text)
+        ReadCommand().run()
 
     def stub_parse(self, **new_options):
-        options = { # default
-            'run_local': True, 'run_remote': False, 
-            'args': [], 'note': None,
-            'rev': None,
-            'is_comment': False,
-        }
+        options = default_options.copy()
+        options.update(args=[])
         options.update(new_options)
         if options.get('run_local'):   
             options.update({'run_remote': False, 'run_remote_on_fail': False})
@@ -282,10 +305,9 @@ class FetchPageConvertTitleToIdTestCase(TestCase):
         should_expect_Page_list(title=title, returns=[page.raw])
         should_expect_page_get(id=id_in_return)
 
-        # run
-        ReadCommand().run()
+        self.run_command()
 
-    def test_is_title_option_raises_error_if_more_than_one_page_is_found(self):
+    def test_is_title__option_raises_error_if_more_than_one_page_is_found(self):
         title = "some title"
         pages = [mock('page'), mock('page')]
 
@@ -295,7 +317,8 @@ class FetchPageConvertTitleToIdTestCase(TestCase):
         mock_on(springnote).Page.is_expected.no_times()
 
         # run
-        self.failUnlessRaises(error.DuplicateResources, lambda: ReadCommand().run())
+        self.failUnlessRaises(error.DuplicateResources, lambda: self.run_command())
+
 
     def test_is_title__option_raises_error_if_no_page_is_found(self):
         title = "some title"
@@ -307,7 +330,7 @@ class FetchPageConvertTitleToIdTestCase(TestCase):
         mock_on(springnote).Page.is_expected.no_times()
 
         # run
-        self.failUnlessRaises(error.NoSuchResource, lambda: ReadCommand().run())
+        self.failUnlessRaises(error.NoSuchResource, lambda: self.run_command())
 
     def test_is_id_option_raises_error_if_arg_is_not_numeric(self):
         title = "a123"
@@ -316,14 +339,14 @@ class FetchPageConvertTitleToIdTestCase(TestCase):
         mock_on(springnote).Page.is_expected.no_times() # exception will raise
 
         # run
-        self.failUnlessRaises(error.OptionError, lambda: ReadCommand().run())
+        self.failUnlessRaises(error.OptionError, lambda: self.run_command())
 
     def test_assumes_numeric_as_id_by_default(self):
         arg = "123"
         self.stub_parse(is_title=False, is_id=False, args=[arg])
 
         mock_on(springnote).Page.is_expected.where_(at_least(id=int(arg)))
-        ReadCommand().run()
+        self.run_command()
 
     def test_assumes_non_numeric_as_title_by_default(self):
         arg = "a123"
@@ -336,27 +359,29 @@ class FetchPageConvertTitleToIdTestCase(TestCase):
         should_expect_page_get(id=id_in_return)
 
         # run
-        ReadCommand().run()
+        self.run_command()
 
 
 class FetchPageWithNoteTestCase(TestCase):
+    def run_command(self):
+        self.stub_format()
+        ReadCommand().run()
+
     def stub_parse(self, **new_options):
-        options = { # default
-            'is_title':  False, 'is_id': False,
-            'run_local': True,  'run_remote': False,
-            'rev': None,
-            'is_comment': False,
-        }
+        options = default_options.copy()
         options.update(new_options)
         option_mock = mock('option').with_children(**options).raw
         mock_on(ReadCommand).parse.is_expected.returning(option_mock)
+
+    def stub_format(self, text='RAW'):
+        mock_on(ReadCommand).format.returning(text)
 
     def test_note_option_sets_note_in_get_page(self):
         note, id = ('jangxyz', 123)
         # mock and run
         self.stub_parse(note=note, args=[id])
         should_expect_page_get(id=id, note=note)
-        ReadCommand().run()
+        self.run_command()
 
     def test_note_option_sets_note_in_list_page_where_needed(self):
         note, title = ('jangxyz', "a123")
@@ -367,21 +392,23 @@ class FetchPageWithNoteTestCase(TestCase):
         should_expect_Page_list(title=title, note=note, returns=pages)
         should_expect_page_get()
 
-        # run
-        ReadCommand().run()
+        self.run_command()
 
 
 class FetchPageWithRevisionTestCase(TestCase):
     def stub_parse(self, **new_options):
-        options = { # default
-            'is_title': False, 'is_id': False,
-            'run_local': True, 'run_remote': False,
-            'args': [], 'note': None,
-            'is_comment': False,
-        }
+        options = default_options.copy()
+        options.update(args=[])
         options.update(new_options)
         option_mock = mock('option').with_children(**options).raw
         mock_on(ReadCommand).parse.is_expected.returning(option_mock)
+
+    def stub_format(self, text='RAW'):
+        mock_on(ReadCommand).format.returning(text)
+
+    def run_command(self):
+        self.stub_format()  # stub out format
+        ReadCommand().run() # run
 
     def test_numeric_rev_option_fetches_page_revision_with_id(self):
         id     =  123
@@ -395,8 +422,7 @@ class FetchPageWithRevisionTestCase(TestCase):
         page_got = mock('page').with_children(get_revision=page_get_revision.raw)
         should_expect_page_get(id=id, returns=page_got.raw)
 
-        # run
-        ReadCommand().run()
+        self.run_command()
 
     
     def test_plus_signed_rev_option_fetches_page_revision_with_index(self):
@@ -409,8 +435,8 @@ class FetchPageWithRevisionTestCase(TestCase):
         page_got = mock('page').with_children(get_revision=page_get_revision.raw)
         should_expect_page_get(id=id, returns=page_got.raw)
 
-        # run
-        ReadCommand().run()
+        self.run_command()
+
 
     def test_minus_signed_rev_option_fetches_page_revision_with_index(self):
         id, rev_idx = (123, '-2')
@@ -422,8 +448,7 @@ class FetchPageWithRevisionTestCase(TestCase):
         page_got = mock('page').with_children(get_revision=page_get_revision.raw)
         should_expect_page_get(id=id, returns=page_got.raw)
 
-        # run
-        ReadCommand().run()
+        self.run_command()
 
 
 

@@ -13,9 +13,16 @@ BASE_PATH = "~/.springcl"
 
 class FileNotExist(Exception): pass
 
-class FileSystemService:
-    def __init__(self, base_dir):
-        self.base_dir = base_dir
+class Service:
+    def __init__(self): self.status = None
+    def request(self):  raise NotImplementedError('inherit me!')
+    def read(self):     raise NotImplementedError('inherit me!')
+
+class FileSystemService(Service):
+    ''' has request(), status, read() '''
+    def __init__(self, base_dir=None):
+        self.base_dir = base_dir or BASE_PATH
+        self.filepath = None
 
     @staticmethod
     def query_dict(query):
@@ -59,14 +66,26 @@ class FileSystemService:
     def request(self, method, url, body=None, verbose=None, **kwarg):
         ''' request resource to local file system, returning in json format '''
         if "GET" == method:
-            filepath = self.parse_url(url)
-            if not os.path.exists(filepath):
-                raise FileNotExist("%s does not exist" % filepath)
+            self.filepath = self.parse_url(url)
+            # udpate status
+            if not os.path.exists(self.filepath):
+                #raise FileNotExist("%s does not exist" % self.filepath)
+                self.status = httplib.NOT_FOUND
+            else:
+                self.status = httplib.OK
 
-            if os.path.isdir(filepath): return self.format_dir_entries(filepath)
-            else:                       return self.readfile(filepath)
+            return self
+
         else:
-            raise NotImlementedError("not yet")
+            raise NotImplementedError("not yet")
+
+    def read(self):
+        ''' should run after request(), when self.filepath is set '''
+        if os.path.isdir(self.filepath):
+            return self.format_dir_entries(self.filepath)
+        else:
+            return self.readfile(self.filepath)
+        
 
     def format_dir_entries(self, path):
         ''' return entries inside directory as json format
