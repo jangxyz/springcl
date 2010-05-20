@@ -8,9 +8,10 @@ CONSUMER_SECRET = 'oOTGX5p8v0bmPa2csaprPTbrpbSmEC17Yscn88sSJg'
 BASE_PATH = "~/.springcl"
 
 class Errors:
-    class DuplicateResources(Exception): pass
-    class NoSuchResource(Exception)    : pass
-    class OptionError(Exception)       : pass
+    class Base(Exception):          pass 
+    class DuplicateResources(Base): pass 
+    class NoSuchResource(Base)    : pass 
+    class OptionError(Base)       : pass 
 
 ## dep.
 class Option:
@@ -170,10 +171,11 @@ class ResourcePointer:
 # springcl commands
 #
 
-def make_sn(auth):
-    sn = springnote.Springnote(consumer_token=(CONSUMER_TOKEN, CONSUMER_SECRET))
+def make_sn(auth, consumer=None):
+    consumer = consumer or (CONSUMER_TOKEN, CONSUMER_SECRET)
+    sn = springnote.Springnote(consumer_token=consumer)
     if auth:
-        sn.set_access_token(auth.split(':'))
+        sn.set_access_token(auth)
     return sn
 
 class SpringclCommand:
@@ -215,14 +217,14 @@ class ReadCommand(SpringclCommand):
         gl = optparse.OptionGroup(p, 'Global options')
 
         # local/remote
-        gl.add_option('--local',  action="store_true", dest="run_remote_on_fail", default=True,  help="local first, remote only when failed")
+        gl.add_option('--local',  action="store_true", dest="run_remote_on_fail", default=False, help="local first, remote only when failed")
         gl.add_option('--remote', action="store_true", dest="run_local_on_fail",  default=False, help="remote first, local only when failed")
         gl.add_option('--local-only',  action="store_true", dest="run_local",  default=False, help="always fetch resource locally")
         gl.add_option('--remote-only', action="store_true", dest="run_remote", default=False, help="always fetch resource remotely")
 
         # auth
-        gl.add_option('--auth',     metavar="TOKKEY", help='use TOKKEY as access token (TOKKEY is TOKEN:KEY format)')
-        gl.add_option('--consumer', metavar="TOKKEY", help='use TOKKEY as consumer token')
+        gl.add_option('--auth',     metavar="TOKSEC", help='use TOKSEC as access token (in TOKEN:SECRET format)')
+        gl.add_option('--consumer', metavar="TOKSEC", help='use TOKSEC as consumer token')
 
         gl.add_option('--basedir', metavar="PATH", default=BASE_PATH, dest="basedir", help='use PATH as local cache basedir')
         gl.add_option('--output', metavar="FILE", default=None, help='output file')
@@ -257,11 +259,16 @@ class ReadCommand(SpringclCommand):
         elif options.run_remote:         pass                      # remote-only
         elif options.run_local:          pass                      # local-only
 
+        # auth
+        if options.auth:     options.auth     = tuple(options.auth.split(':'))
+        if options.consumer: options.consumer = tuple(options.consumer.split(':'))
+        else:                options.consumer = (CONSUMER_TOKEN, CONSUMER_SECRET)
+
         return options
 
     def sn(self, options, service=None):
         ''' return proper sn, according to options and service given '''
-        self._sn = self._sn or make_sn(options.auth)
+        self._sn = self._sn or make_sn(options.auth, options.consumer)
 
         new_service = self._remote_service if options.run_remote else self._local_service
         service = service or new_service
@@ -300,27 +307,30 @@ class ReadCommand(SpringclCommand):
         return resource_id
 
     def try_fetch(self, fetch_method, options):
-        ''' try fetching resource from local, remote, or both, following the options '''
+        ''' try fetching resource from local, remote, or both, following 
+            the options set '''
         # try
         try:
             result = fetch_method(sn=self.sn(options))
             sn = None
         except filesystem_service.FileNotExist, e:
             sn = None
-            if options.run_remote_on_fail:
-                sn = self.sn(options, service=self._remote_service)
-            else:
-                raise e
+            if not options.run_remote_on_fail:
+                raise Errors.NoSuchResource(e.message)
+            sn = self.sn(options, service=self._remote_service)
+
         #except springnote.SpringnoteError.NoNetwork, e:
         except springnote.SpringnoteError.Base, e:
-            print 'error on remote, trying local : %s' % e
-            if options.run_local_on_fail:
-                sn = self.sn(options, service=self._local_service)
-            else:
+            self.write('error on remote, trying local : %s' % e, options.output)
+            if not options.run_local_on_fail:
                 raise e
+            sn = self.sn(options, service=self._local_service)
         # retry
         if sn:
-            result = fetch_method(sn=sn)
+            try:
+                result = fetch_method(sn=sn)
+            except filesystem_service.FileNotExist, e:
+                raise Errors.NoSuchResource(e.message)
         return result
 
     def run(self):
@@ -400,7 +410,6 @@ class ReadPathCommand(ReadCommand):
         self.options = options
 
     def format_path(self, note, id, rev, options):
-        print options
         if options.run_local:
             return self._local_service.build_path(id, note, revisions=rev)
         # TODO: do me!

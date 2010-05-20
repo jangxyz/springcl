@@ -38,12 +38,6 @@ def should_expect_Page_list(returns, *args, **kwargs):
     mock_on(springnote).Page.with_children(list=list_wrapper.raw)
     return mock_on(springnote).Page
 
-#def should_expect_page(returns, *args, **kwargs):
-#    mock_on(springnote).Page.is_expected.once() \
-#        .where_(at_least(**kwargs))             \
-#        .returning(returns)
-#    return mock_on(springnote).Page
-
 def should_expect_page_get(returns=None, *args, **kwargs):
     # page.get() mock
     page_get = mock('page.get').is_expected._mock_wrapper
@@ -67,14 +61,17 @@ default_options = {
     'is_path': False,
     'basedir': None,
     'output': '/dev/null',
-
     'auth': None,
+    'consumer': None,
 }
+
+class StopTesting(Exception): pass
 
 class OptionTestCase(TestCase):
     def get_options(self, opt_list):
         if isinstance(opt_list, types.StringTypes):
             opt_list = opt_list.split()
+        #opt_list.append("563954")
 
         return ReadCommand(opt_list).options
 
@@ -82,8 +79,8 @@ class LocalRemoteOptionTestCase(OptionTestCase):
     def test_remote_option_sets__run_remote__and__run_local_on_fail__to_true(self):
         options = self.get_options("--remote 123")
         # verify
-        assert_that(options.run_remote       , is_(True))
-        assert_that(options.run_local_on_fail, is_(True))
+        assert_that(options.run_remote       ,  is_(True))
+        assert_that(options.run_local_on_fail,  is_(True))
         assert_that(options.run_local         , is_(False))
         assert_that(options.run_remote_on_fail, is_(False))
 
@@ -151,6 +148,20 @@ class OutputOptionTestCase(OptionTestCase):
         options = self.get_options("563954")
         assert_that(options.output, is_(None))
 
+class AuthOptionTestCase(OptionTestCase):
+    def test_auth__option_sets_access_token(self):
+        options = self.get_options("--auth ACCESS_TOKEN:SECRET 563954")
+        assert_that(options.auth, is_(("ACCESS_TOKEN", "SECRET")))
+
+    def test_consumer__option_sets_access_token(self):
+        options = self.get_options("--consumer CONSUMER_TOKEN:SECRET 563954")
+        assert_that(options.consumer, is_(("CONSUMER_TOKEN", "SECRET")))
+
+    def test_default__consumer__option(self):
+        options = self.get_options("563954")
+        assert_that(options.consumer[0], is_(springcl_commands.CONSUMER_TOKEN))
+        assert_that(options.consumer[1], is_(springcl_commands.CONSUMER_SECRET))
+
 
 ######
 #
@@ -165,10 +176,9 @@ class LoadSn(TestCase):
         ReadCommand(['123']).run()
 
     def test_loads_sn(self):
-        class StopTest(Exception): pass
 
-        mock_on(springnote).Springnote.is_expected.raising(StopTest)
-        self.assertRaises(StopTest, lambda: self.run_command())
+        mock_on(springnote).Springnote.is_expected.raising(StopTesting)
+        self.assertRaises(StopTesting, lambda: self.run_command())
 
     def test_calls_Page_with_sn(self):
         sn_is_first_arg = lambda *args, **kw: isinstance(args[0], springnote.Springnote)
@@ -382,7 +392,7 @@ class FetchPageWithNoteTestCase(TestCase):
     def stub_format(self, text='RAW'):
         mock_on(ReadCommand).format.returning(text)
 
-    def test_note_option_sets_note_in_get_page(self):
+    def test_note__option_sets_note_in_get_page(self):
         note, id = ('jangxyz', 123)
         # mock and run
         self.stub_parse(note=note, args=[id])
@@ -477,9 +487,49 @@ class ReadPathCommandTestCase(TestCase):
     #def test_remote_comments(self):   pass 
 
 
-
 class AuthRemoteTestCase(TestCase):
-    pass
+    def stub_parse(self, **new_options):
+        options = default_options.copy()
+        options.update(new_options)
+        option_mock = mock('option').with_children(**options).raw
+        mock_on(ReadCommand).parse.is_expected.returning(option_mock)
+
+    def run_command(self):
+        ReadCommand(['123']).run()
+
+    def test_use_access_token_when_calling_remote(self):
+        access_token = ('ACCESS', 'TOKEN')
+
+        def access_token_is_used(*args, **kwargs):
+            token = kwargs['sign_token']
+            return (token.key, token.secret) == access_token
+
+        # mock
+        self.stub_parse(auth=access_token)
+        mock_on(springnote.Springnote).oauth_request.is_expected \
+            .where_(access_token_is_used).raising(StopTesting)
+
+        # run
+        mock_on(ReadCommand).format.returning('RAW')
+        self.assertRaises(StopTesting, lambda: self.run_command())
+
+
+    def test_use_access_token_when_calling_remote(self):
+        consumer_token = ('CONSUMER', 'TOKEN')
+
+        def consumer_token_is_used(*args, **kwargs):
+            token = args[0]
+            return (token.key, token.secret) == consumer_token 
+
+        # mock
+        self.stub_parse(consumer=consumer_token)
+        OAuthRequest = springnote.oauth.OAuthRequest
+        mock_on(OAuthRequest).from_consumer_and_token.is_expected  \
+            .where_(consumer_token_is_used).raising(StopTesting)
+
+        # run
+        mock_on(ReadCommand).format.returning('RAW')
+        self.assertRaises(StopTesting, lambda: self.run_command())
 
 class UpdateRemoteResourceTestCase(TestCase):
     pass

@@ -108,11 +108,6 @@ def format_url(options):
 
 
 if __name__ == '__main__':
-    #options = parse(arguments=sys.argv[1:])
-    #print options
-    #url = format_url(options)
-    #print url
-
     arg = sys.argv[1]
     cmd = commands.get(sys.argv[1], None)
     if cmd is not None:
@@ -120,5 +115,8 @@ if __name__ == '__main__':
             cmd(sys.argv[2:]).run()
         except springcl_commands.Errors.OptionError:
             print cmd.usage()
+        except springcl_commands.Errors.Base, e:
+            print e.__class__.__name__ + ':', e.message
+            sys.exit(-1)
 
 
