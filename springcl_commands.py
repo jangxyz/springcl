@@ -3,6 +3,10 @@ import filesystem_service
 
 import optparse, sys
 
+CONSUMER_TOKEN  = '5aUy7Iz0Rf7RHFflaY2kNQ'
+CONSUMER_SECRET = 'oOTGX5p8v0bmPa2csaprPTbrpbSmEC17Yscn88sSJg'
+BASE_PATH = "~/.springcl"
+
 class Errors:
     class DuplicateResources(Exception): pass
     class NoSuchResource(Exception)    : pass
@@ -166,13 +170,16 @@ class ResourcePointer:
 # springcl commands
 #
 
-def make_sn(service=None):
-    return springnote.Springnote(service=service)
+def make_sn(auth):
+    sn = springnote.Springnote(consumer_token=(CONSUMER_TOKEN, CONSUMER_SECRET))
+    if auth:
+        sn.set_access_token(auth.split(':'))
+    return sn
 
 class SpringclCommand:
     _sn = None
     _remote_service = springnote.HttpRequestService()
-    _local_service  = filesystem_service.FileSystemService()
+    _local_service  = filesystem_service.FileSystemService(BASE_PATH)
 
 class ReadCommand(SpringclCommand):
     ''' read resource, either from local file system or springnote.com.
@@ -208,7 +215,7 @@ class ReadCommand(SpringclCommand):
         gl = optparse.OptionGroup(p, 'Global options')
 
         # local/remote
-        gl.add_option('--local',  action="store_true", dest="run_remote_on_fail", default=False, help="local first, remote only when failed")
+        gl.add_option('--local',  action="store_true", dest="run_remote_on_fail", default=True,  help="local first, remote only when failed")
         gl.add_option('--remote', action="store_true", dest="run_local_on_fail",  default=False, help="remote first, local only when failed")
         gl.add_option('--local-only',  action="store_true", dest="run_local",  default=False, help="always fetch resource locally")
         gl.add_option('--remote-only', action="store_true", dest="run_remote", default=False, help="always fetch resource remotely")
@@ -217,7 +224,7 @@ class ReadCommand(SpringclCommand):
         gl.add_option('--auth',     metavar="TOKKEY", help='use TOKKEY as access token (TOKKEY is TOKEN:KEY format)')
         gl.add_option('--consumer', metavar="TOKKEY", help='use TOKKEY as consumer token')
 
-        gl.add_option('--basedir', metavar="PATH", dest="basedir", help='use PATH as local cache basedir')
+        gl.add_option('--basedir', metavar="PATH", default=BASE_PATH, dest="basedir", help='use PATH as local cache basedir')
         gl.add_option('--output', metavar="FILE", default=None, help='output file')
         p.add_option_group(gl)
 
@@ -234,8 +241,8 @@ class ReadCommand(SpringclCommand):
         p.add_option('--format', help='specify format in action')
 
         # resource type
-        p.add_option('--comment', action="store_true", dest="is_comment", help='get comments of the page')
-        p.add_option('--path',    action="store_true", dest="is_path", help='do not print any content of file, but the path where the cache is saved in.')
+        p.add_option('--comment', action="store_true", dest="is_comment", default=False, help='get comments of the page')
+        p.add_option('--path',    action="store_true", dest="is_path",    default=False, help='do not print any content of file, but the path where the cache is saved in.')
         #p.add_option('--page', metavar='PAGE_ID', action=)
 
         return p
@@ -252,14 +259,14 @@ class ReadCommand(SpringclCommand):
 
         return options
 
-    def sn(self, option, service=None):
-        self._sn = self._sn or make_sn()
+    def sn(self, options, service=None):
+        ''' return proper sn, according to options and service given '''
+        self._sn = self._sn or make_sn(options.auth)
 
-        new_service = self._remote_service if option.run_remote else self._local_service
+        new_service = self._remote_service if options.run_remote else self._local_service
         service = service or new_service
-
-        if isinstance(service, filesystem_service.FileSystemService) and option.basedir:
-            service.base_dir = option.basedir
+        if isinstance(service, filesystem_service.FileSystemService) and options.basedir:
+            service.base_dir = options.basedir
 
         # update service of sn 
         self._sn.service = service
@@ -304,7 +311,9 @@ class ReadCommand(SpringclCommand):
                 sn = self.sn(options, service=self._remote_service)
             else:
                 raise e
-        except springnote.SpringnoteError.NoNetwork, e:
+        #except springnote.SpringnoteError.NoNetwork, e:
+        except springnote.SpringnoteError.Base, e:
+            print 'error on remote, trying local : %s' % e
             if options.run_local_on_fail:
                 sn = self.sn(options, service=self._local_service)
             else:
@@ -314,27 +323,11 @@ class ReadCommand(SpringclCommand):
             result = fetch_method(sn=sn)
         return result
 
-    def run_list_comments(self, id, note=None, options=None):
-        ''' fetch comments of the page '''
-        fetch_page_comments = lambda sn: springnote.Page(sn, id=id, note=note).list_comments()
-        return self.try_fetch(fetch_page_comments, options)
-
     def run(self):
         ''' figure out proper subcommand and delegate to it '''
-        #opt = self.options
-        ## run 
-        #resource_id = self.find_resource_id(opt.args[0], opt)
-        #if opt.is_comment:
-        #    result = self.run_list_comments(id=resource_id, note=opt.note, options=opt)
-        #else:
-        #    result = self.run_get_page(id=resource_id, note=opt.note, rev=opt.rev, options=opt)
-        #print self.format(result.raw)
-        #return result
-        if self.options.is_comment:
-            cmd = ReadCommentsCommand(self)
-        else:
-            cmd = ReadPageCommand(self)
-
+        if self.options.is_comment: cmd = ReadCommentsCommand(self.options)
+        if self.options.is_path:    cmd = ReadPathCommand(self.options)
+        else:                       cmd = ReadPageCommand(self.options)
         return cmd.run()
 
     def format(self, text):
@@ -343,20 +336,20 @@ class ReadCommand(SpringclCommand):
     def write(self, text, output):
         f = sys.stdout if output is None else open(output, 'a')
         f.write(text)
+        f.write("\n")
         if output:
             f.close()
 
 
 class ReadPageCommand(ReadCommand):
     ''' read a single page resource '''
-    def __init__(self, read):
-        self.parent  = read
-        self.options = self.parent.options
+    def __init__(self, options):
+        self.options = options
 
-    def fetch_page_with_revision(self, sn, note, id, rev):
+    def fetch_page_with_revision(self, sn, note, id, rev=None):
         # fetch page
-        page = springnote.Page(sn, id=id, note=note).get()
-        # get rev if given
+        page = springnote.Page(sn, note=note, id=id).get()
+        # get revision if given
         if rev:
             if rev[0] in ('-', '+'):    key = 'index'
             else:                       key = 'id'
@@ -378,29 +371,51 @@ class ReadPageCommand(ReadCommand):
 
         return result
 
+
 class ReadCommentsCommand(ReadCommand):
-    ''' read comments from a page '''
-    def __init__(self, read):
-        self.parent  = read
-        self.options = self.parent.options
+    ''' read list of comments from a page '''
+    def __init__(self, options):
+        self.options = options
 
     def fetch_comments_in_page(self, sn, id, note):
         return springnote.Page(sn, id=id, note=opt.note).list_comments()
 
     def run(self):
-        opt = self.options
         # run 
-        resource_id = self.find_resource_id(opt.args[0], opt)
-        note = opt.note
+        resource_id = self.find_resource_id(self.options.args[0], self.options)
+        note = self.options.note
 
         fetch_comments = lambda sn: fetch_comments_in_page(sn, resource_id, note)
-        result = self.try_fetch(fetch_comments, options)
+        result = self.try_fetch(fetch_comments, self.options)
 
         # read
-        self.write(self.format(result.raw), options.output)
+        self.write(self.format(result.raw), self.options.output)
 
         return result
 
+
+class ReadPathCommand(ReadCommand):
+    ''' simply return path of target resource '''
+    def __init__(self, options):
+        self.options = options
+
+    def format_path(self, note, id, rev, options):
+        print options
+        if options.run_local:
+            return self._local_service.build_path(id, note, revisions=rev)
+        # TODO: do me!
+        else:
+            pass
+
+    def run(self):
+        resource_id = self.find_resource_id(self.options.args[0], self.options)
+        note = self.options.note
+
+        # path
+        result = self.format_path(note, resource_id, self.options.rev, self.options)
+        self.write(result, self.options.output)
+
+        return result
 
 class ReadAttachmentCommand(ReadCommand):
     ''' read a single attachment from a page '''
@@ -410,4 +425,5 @@ class ReadAttachmentCommand(ReadCommand):
     def format(self, text): pass
     @classmethod
     def usage(cls):         pass
+
 

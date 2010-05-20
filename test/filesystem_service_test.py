@@ -3,8 +3,8 @@
     File System Service 
 '''
 
-import unittest
-#import unittest_decorator as unittest
+#import unittest
+import unittest_decorator_patch as unittest
 from hamcrest import *
 from mocktest import *
 import sys, os; sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
@@ -39,11 +39,11 @@ class ParseUrlTestCase(unittest.TestCase):
 
     def test_list_page(self):
         url = "http://api.springnote.com/pages.json"
-        assert_that(self.parse(url), ends_with("/default"))
+        assert_that(self.parse(url), ends_with("/default/"))
 
     def test_list_page_with_domain(self):
         url = "http://api.springnote.com/pages.json?domain=jangxyz"
-        assert_that(self.parse(url), ends_with("/jangxyz"))
+        assert_that(self.parse(url), ends_with("/jangxyz/"))
 
     def test_get_page(self):
         url = "http://api.springnote.com/pages/563954.json?domain=jangxyz"
@@ -51,7 +51,7 @@ class ParseUrlTestCase(unittest.TestCase):
 
     def test_list_revision(self):
         url = "/pages/563954/revisions.json"
-        assert_that(self.parse(url), ends_with("/default/563954/revisions"))
+        assert_that(self.parse(url), ends_with("/default/563954/revisions/"))
 
     def test_get_revision(self):
         url = "/pages/563954/revisions/29685883.json"
@@ -59,7 +59,7 @@ class ParseUrlTestCase(unittest.TestCase):
     
     def test_list_attachment(self):
         url = "/pages/563954/attachments.json"
-        assert_that(self.parse(url), ends_with("/default/563954/attachments"))
+        assert_that(self.parse(url), ends_with("/default/563954/attachments/"))
 
     def test_get_attachment(self):
         url = "/pages/563954/attachments/559756.json"
@@ -148,6 +148,9 @@ class FormatDirEntriesTestCase(TestCase):
 
 class RequestGetTestCase(TestCase):
     ''' testing FileSystemService.request, with method 'GET' '''
+    def run_command(self):
+        req = self.service.request("GET", "/some/path")
+        req.read()
 
     def setUp(self):
         self.path = "/some/path"
@@ -173,14 +176,14 @@ class RequestGetTestCase(TestCase):
         self.service_anchor.readfile.is_expected.with_args(self.path)
 
         # run
-        self.service.request("GET", "/some/url")
+        self.run_command()
 
     def test_raise_exception_when_no_such_file(self):
         self.set_file_exists(self.path, False)
         # run
         self.failUnlessRaises(
             filesystem_service.FileNotExist,
-            lambda: self.service.request("GET", "/some/url")
+            lambda: self.run_command()
         )
 
     def test_reads_contents_in_directory_if_path_is_directory(self):
@@ -190,7 +193,7 @@ class RequestGetTestCase(TestCase):
         self.service_anchor.format_dir_entries.is_expected.with_args(self.path)
 
         # run
-        self.service.request("GET", "/some/url")
+        self.run_command()
 
     def test_read_single_file_if_path_is_not_a_directory(self):
         # mock
@@ -199,7 +202,7 @@ class RequestGetTestCase(TestCase):
         self.service_anchor.readfile.is_expected.with_args(self.path)
 
         # run
-        self.service.request("GET", "/some/url")
+        self.run_command()
 
 
 

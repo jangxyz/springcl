@@ -64,8 +64,11 @@ default_options = {
     'args': [123], 'note': None,
     'rev': None,
     'is_comment': False,
+    'is_path': False,
     'basedir': None,
     'output': '/dev/null',
+
+    'auth': None,
 }
 
 class OptionTestCase(TestCase):
@@ -105,8 +108,8 @@ class LocalRemoteOptionTestCase(OptionTestCase):
         # verify
         assert_that(options.run_local         , is_(True))
         assert_that(options.run_remote_on_fail, is_(False))
-        assert_that(options.run_remote       , is_(False))
-        assert_that(options.run_local_on_fail, is_(False))
+        assert_that(options.run_remote       ,  is_(False))
+        assert_that(options.run_local_on_fail,  is_(False))
 
 
 class TitleIdOptionTestCase(OptionTestCase):
@@ -149,6 +152,9 @@ class OutputOptionTestCase(OptionTestCase):
         assert_that(options.output, is_(None))
 
 
+######
+#
+######
 
 class LoadSn(TestCase):
     def setUp(self):
@@ -396,6 +402,10 @@ class FetchPageWithNoteTestCase(TestCase):
 
 
 class FetchPageWithRevisionTestCase(TestCase):
+    def run_command(self):
+        self.stub_format()  # stub out format
+        ReadCommand().run()
+
     def stub_parse(self, **new_options):
         options = default_options.copy()
         options.update(args=[])
@@ -405,10 +415,6 @@ class FetchPageWithRevisionTestCase(TestCase):
 
     def stub_format(self, text='RAW'):
         mock_on(ReadCommand).format.returning(text)
-
-    def run_command(self):
-        self.stub_format()  # stub out format
-        ReadCommand().run() # run
 
     def test_numeric_rev_option_fetches_page_revision_with_id(self):
         id     =  123
@@ -450,6 +456,33 @@ class FetchPageWithRevisionTestCase(TestCase):
 
         self.run_command()
 
+class ReadPathCommandTestCase(TestCase):
+    def run_command(self):
+        mock_on(ReadCommand).format.returning(text)
+        ReadCommand().run()
+
+    def stub_parse(self, **new_options):
+        options = default_options.copy()
+        options.update(new_options)
+        option_mock = mock('option').with_children(**options).raw
+        mock_on(ReadCommand).parse.is_expected.returning(option_mock)
+
+    #def test_local_page(self):       pass 
+    #def test_local_revision(self):   pass 
+    #def test_local_attachment(self): pass 
+    #def test_local_comments(self):   pass 
+    #def test_remote_page(self):       pass 
+    #def test_remote_revision(self):   pass 
+    #def test_remote_attachment(self): pass 
+    #def test_remote_comments(self):   pass 
+
+
+
+class AuthRemoteTestCase(TestCase):
+    pass
+
+class UpdateRemoteResourceTestCase(TestCase):
+    pass
 
 
 if __name__ == '__main__':

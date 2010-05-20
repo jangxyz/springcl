@@ -9,7 +9,8 @@
 
 """
 import urllib, httplib, os
-BASE_PATH = "~/.springcl"
+
+DEFAULT_NOTE_DIRNAME = 'default'
 
 class FileNotExist(Exception): pass
 
@@ -20,8 +21,8 @@ class Service:
 
 class FileSystemService(Service):
     ''' has request(), status, read() '''
-    def __init__(self, base_dir=None):
-        self.base_dir = base_dir or BASE_PATH
+    def __init__(self, base_dir):
+        self.base_dir = base_dir
         self.filepath = None
 
     @staticmethod
@@ -44,22 +45,53 @@ class FileSystemService(Service):
         '''
         # extract path and query from url
         _scheme, _netloc, path, query, _fragment = httplib.urlsplit(url)
-
-        # domain
-        domain   = self.query_dict(query).get('domain', 'default')
-        filepath = os.path.join(self.base_dir, domain)
+        domain = self.query_dict(query).get('domain')
 
         # build path
-        resource, last_resource, id = None, None, None
         path, _sep, format = path.partition('.')
+        id = (path.split('/', 3) + [None]*3)[2]
+
+        resource_dict = {}
         l = filter(None, path.split('/'))
-        for resource, id in zip(l[::2], l[1::2] + [None]):
-            if resource != "pages": filepath = os.path.join(filepath, resource)
-            if id is not None:      filepath = os.path.join(filepath, id)
-            last_resource = resource
-        if id is not None:
-            if "pages" == last_resource:  filepath = os.path.join(filepath, id)
-            if format:                    filepath += '.' + format
+        for resource, r_id in zip(l[::2], l[1::2] + [None]):
+            resource_dict[resource] = r_id or True
+        resource_dict.pop('pages')
+
+        return self.build_path(id, domain, format, **resource_dict)
+
+
+    def build_path(self, id, note=None, format=None, **resources):
+        '''
+         revision or attachment should be None, True, or its resource id
+
+         * (id=None, note=None)     /default/
+         * (id=None)                /jangxyz/
+         *                          /jangxyz/563954/563954.json
+         * ({revisions=True})       /default/563954/revisions/
+         * ({attachments=True})     /default/563954/attachments/
+         * ({revisions=29685883})   /default/563954/revisions/29685883.json
+         * ({attachments=559756)})  /default/563954/attachments/559756.json
+        '''
+        note = note or DEFAULT_NOTE_DIRNAME
+        if format: format = '.' + format
+        if format is None: format = '.json'
+        # /jangxyz
+        filepath = os.path.join(self.base_dir, note) + os.path.sep
+
+        # LIST pages
+        if not id: return filepath
+
+        # /jangxyz/563954
+        filepath += str(id) + os.path.sep
+
+        # GET page
+        if len(resources) is 0:
+            filepath += str(id) + format
+        # subresources
+        else:
+            for r_name, r_id in resources.iteritems():
+                filepath += r_name + os.path.sep                # LIST
+                if r_id is not True: filepath += r_id + format  # GET
 
         return filepath
 
@@ -69,7 +101,6 @@ class FileSystemService(Service):
             self.filepath = self.parse_url(url)
             # udpate status
             if not os.path.exists(self.filepath):
-                #raise FileNotExist("%s does not exist" % self.filepath)
                 self.status = httplib.NOT_FOUND
             else:
                 self.status = httplib.OK
@@ -81,11 +112,13 @@ class FileSystemService(Service):
 
     def read(self):
         ''' should run after request(), when self.filepath is set '''
+        if not os.path.exists(self.filepath):
+            raise FileNotExist("%s does not exist" % self.filepath)
+
         if os.path.isdir(self.filepath):
             return self.format_dir_entries(self.filepath)
         else:
             return self.readfile(self.filepath)
-        
 
     def format_dir_entries(self, path):
         ''' return entries inside directory as json format
