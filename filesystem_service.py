@@ -12,6 +12,7 @@ import urllib, httplib, os
 
 DEFAULT_NOTE_DIRNAME = 'default'
 
+
 class FileNotExist(Exception): pass
 
 class Service:
@@ -75,6 +76,9 @@ class FileSystemService(Service):
         note = note or DEFAULT_NOTE_DIRNAME
         if format: format = '.' + format
         if format is None: format = '.json'
+        for non_key in filter(lambda k: resources[k] is None, resources):
+            del resources[non_key]
+
         # /jangxyz
         filepath = os.path.join(self.base_dir, note) + os.path.sep
 
@@ -84,14 +88,14 @@ class FileSystemService(Service):
         # /jangxyz/563954
         filepath += str(id) + os.path.sep
 
-        # GET page
+        # GET page: /jangxyz/563954/563954.json
         if len(resources) is 0:
             filepath += str(id) + format
         # subresources
         else:
             for r_name, r_id in resources.iteritems():
-                filepath += r_name + os.path.sep                # LIST
-                if r_id is not True: filepath += r_id + format  # GET
+                filepath += r_name + os.path.sep                    # LIST
+                if r_id is not True: filepath += str(r_id) + format # GET
 
         return filepath
 
@@ -100,15 +104,12 @@ class FileSystemService(Service):
         if "GET" == method:
             self.filepath = self.parse_url(url)
             # udpate status
-            if not os.path.exists(self.filepath):
-                self.status = httplib.NOT_FOUND
-            else:
-                self.status = httplib.OK
+            if os.path.exists(self.filepath):   self.status = httplib.OK
+            else:                               self.status = httplib.NOT_FOUND
 
             return self
 
-        else:
-            raise NotImplementedError("not yet")
+        else: raise NotImplementedError("not yet")
 
     def read(self):
         ''' should run after request(), when self.filepath is set '''
@@ -140,8 +141,62 @@ class FileSystemService(Service):
 
     def readfile(self, filename):
         return open(filename).read()
-    
 
+
+#import tempfile
+#def merge(src, dest):
+#    ''' merge between two directories:
+#
+#    1. create temp/ directory
+#    2. copy all files from src/ and dest/ to temp/, where
+#    3. choose newer if file with same name exists
+#    4. backup dest/ for a moment,
+#    5. remove dest/
+#    6. rename temp/ to dest/
+#    7. remove dest-backup/
+#    8. if any error happens, restore dest-backup/
+#    '''
+#    if os.path.isfile(src):
+#        return merge_file(src, dest)
+#    tempdir = tempfile.mkdtemp()
+
+
+def newer(*files):
+    return max(files, key=os.path.getmtime)
+
+def merge_file(src, dest, output=None):
+    ''' the newer file among src and dest becomes dest, REMOVING src '''
+    assert os.path.isfile(src)
+
+    # dest is already a newer file
+    if os.path.exists(dest) and newer(src, dest) is dest:
+        os.remove(src)
+        return
+
+    # XXX: might have error on windows!
+    os.rename(src, dest)
+
+
+def merge_dir(src, dest):
+    ''' merge directories src and dest, choosing the newer if same file exists 
+    src is REMOVED. 
+    '''
+    assert os.path.exists(src) and os.path.isdir(src)
+    if not os.path.exists(dest):
+        os.makedirs(dest)
+    if os.path.samefile(src, dest): return
+
+    # merge contents inside
+    for filename in os.listdir(src):
+        src_file  = os.path.join(src,  filename)
+        dest_file = os.path.join(dest, filename)
+
+        if os.path.isdir(src_file): merge = merge_dir
+        else:                       merge = merge_file
+        merge(src_file, dest_file)
+
+    # REMOVE src
+    os.rmdir(src)
 
 if __name__ == '__main__':
     pass

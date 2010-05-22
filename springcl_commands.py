@@ -1,17 +1,18 @@
 import springnote
 import filesystem_service
 
-import optparse, sys
+import optparse, sys, os
 
 CONSUMER_TOKEN  = '5aUy7Iz0Rf7RHFflaY2kNQ'
 CONSUMER_SECRET = 'oOTGX5p8v0bmPa2csaprPTbrpbSmEC17Yscn88sSJg'
-BASE_PATH = "~/.springcl"
+BASE_PATH = os.path.expanduser("~/.springcl")
 
 class Errors:
-    class Base(Exception):          pass 
-    class DuplicateResources(Base): pass 
-    class NoSuchResource(Base)    : pass 
-    class OptionError(Base)       : pass 
+    class Base(Exception):          pass
+    class DuplicateResources(Base): pass
+    class NoSuchResource(Base):     pass
+    class OptionError(Base):        pass
+    class ThisShouldntHappen(Base): pass
 
 ## dep.
 class Option:
@@ -280,6 +281,9 @@ class ReadCommand(SpringclCommand):
 
         return self._sn
 
+    def last_ran_service_was_remote(self):
+        return isinstance(self._sn.service, springnote.HttpRequestService)
+
     def find_resource_id(self, arg, options):
         ''' find resource id from given arg and options 
 
@@ -319,19 +323,57 @@ class ReadCommand(SpringclCommand):
                 raise Errors.NoSuchResource(e.message)
             sn = self.sn(options, service=self._remote_service)
 
-        #except springnote.SpringnoteError.NoNetwork, e:
         except springnote.SpringnoteError.Base, e:
             self.write('error on remote, trying local : %s' % e, options.output)
             if not options.run_local_on_fail:
                 raise e
             sn = self.sn(options, service=self._local_service)
+
         # retry
         if sn:
             try:
                 result = fetch_method(sn=sn)
             except filesystem_service.FileNotExist, e:
                 raise Errors.NoSuchResource(e.message)
+
+        # update local cache
+        if self.last_ran_service_was_remote():
+            self.update_local_cache(result, options)
+
         return result
+
+    def connect_default_note(self, resource_note, option_note):
+        ''' change default/ directory into symlink, it not already '''
+        default_path = self.format_local_path(note=None, id=None)
+        if os.path.islink(default_path): return 
+
+        # should identify the default note
+        if option_note is None and resource_note is not None:
+            # merge
+            actual_dir = self.format_local_path(note=resource_note, id=None)
+            #print 'connecting', default_path, 'to', actual_dir, '...'
+            filesystem_service.merge_dir(default_path, actual_dir)
+
+            # add symlink
+            prefix = os.path.commonprefix((actual_dir, default_path))
+            prelen = len(prefix)
+            os.symlink(actual_dir[prelen:].rstrip('/'), default_path.rstrip('/'))
+
+    def update_local_cache(self, resource, options):
+        ''' save resource to local cache '''
+        # sym link default note dir to actual note if not already
+        self.connect_default_note(resource.note, options.note)
+
+        # TODO: move this into service?
+        #print 'update local cache at', path
+        path = self.format_resource_path(resource, run_local=True)
+        if not os.path.exists(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
+
+        f = open(path, 'w')
+        f.write(resource.raw)
+        f.close()
+
 
     def run(self):
         ''' figure out proper subcommand and delegate to it '''
@@ -349,6 +391,25 @@ class ReadCommand(SpringclCommand):
         f.write("\n")
         if output:
             f.close()
+
+    def format_resource_path(self, resource, run_local):
+        run_local = run_local or self.options.run_local
+        is_page = isinstance(resource, springnote.Page) 
+        page_id = resource.id if is_page else resource.parent.id
+        return self.format_path(resource.note, resource.id, rev=None, run_local=run_local)
+
+    def format_local_path(self, note, id, rev=None):
+        return self._local_service.build_path(id, note, revisions=rev)
+
+    def format_path(self, note, id, rev=None, run_local=None):
+        if run_local is None:
+            run_local = self.options.run_local
+
+        if run_local:
+            return self.format_local_path(note, id, rev)
+        else:
+            # TODO: do me!
+            raise NotImplementedError("cannot return path for remote resource")
 
 
 class ReadPageCommand(ReadCommand):
@@ -409,19 +470,12 @@ class ReadPathCommand(ReadCommand):
     def __init__(self, options):
         self.options = options
 
-    def format_path(self, note, id, rev, options):
-        if options.run_local:
-            return self._local_service.build_path(id, note, revisions=rev)
-        # TODO: do me!
-        else:
-            pass
-
     def run(self):
         resource_id = self.find_resource_id(self.options.args[0], self.options)
         note = self.options.note
 
         # path
-        result = self.format_path(note, resource_id, self.options.rev, self.options)
+        result = self.format_path(note, resource_id, self.options.rev, self.options.run_local)
         self.write(result, self.options.output)
 
         return result
@@ -434,5 +488,4 @@ class ReadAttachmentCommand(ReadCommand):
     def format(self, text): pass
     @classmethod
     def usage(cls):         pass
-
 

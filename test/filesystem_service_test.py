@@ -205,6 +205,90 @@ class RequestGetTestCase(TestCase):
         self.run_command()
 
 
+class MergeTestCase(unittest.TestCase):
+    SRC_DIR  = os.path.join(os.path.dirname(__file__), 'tmp', 'src')
+    DEST_DIR = os.path.join(os.path.dirname(__file__), 'tmp', 'dest')
+    SRC_CONTENT  = "SRC"
+    DEST_CONTENT = "DEST"
+
+    def setUp(self):
+        assert not os.path.exists(self.SRC_DIR)
+        assert not os.path.exists(self.DEST_DIR)
+        os.makedirs(self.SRC_DIR)
+        os.makedirs(self.DEST_DIR)
+
+    def tearDown(self):
+        dir = os.path.join(os.path.dirname(__file__), 'tmp')
+        for root, dirs, files in os.walk(dir, topdown=False):
+            for name in files:  os.remove(os.path.join(root, name))
+            for name in dirs:   os.rmdir(os.path.join(root, name))
+        os.rmdir('tmp')
+
+    def run_command(self):
+        filesystem_service.merge_dir(self.SRC_DIR, self.DEST_DIR)
+
+    def create(self, parent, path, content=None):
+        fullpath = os.path.join(parent, path)
+        if not os.path.exists(os.path.dirname(fullpath)):
+            os.makedirs(os.path.dirname(fullpath))
+        if not path.endswith('/'):
+            f = open(fullpath, 'w')
+            f.write(content or "TEST")
+            f.close()
+    def src_create(self, path):   return self.create(self.SRC_DIR,  path, self.SRC_CONTENT)
+    def dest_create(self, path):  return self.create(self.DEST_DIR, path, self.DEST_CONTENT)
+
+    def dest_has(self, path):
+        fullpath = os.path.join(self.DEST_DIR, path)
+        return os.path.exists(fullpath)
+
+    def set_newer(self, parent, path):
+        fullpath = os.path.join(parent, path)
+        st = os.stat(fullpath)
+        os.utime(fullpath, (st.st_atime +1000, st.st_mtime +1000))
+    def set_src_newer(self, path):  return self.set_newer(self.SRC_DIR, path)
+    def set_dest_newer(self, path): return self.set_newer(self.DEST_DIR, path)
+
+    def content_of(self, path):
+        fullpath = os.path.join(self.DEST_DIR, path)
+        f = open(fullpath)
+        content = f.read()
+        f.close()
+        return content
+
+    def test_should_update_when_destination_does_not_exist(self):
+        self.src_create('new_dir/')
+        self.src_create('file1')
+
+        self.run_command()
+        assert self.dest_has('new_dir/')
+        assert self.dest_has('file1')
+
+    def test_should_update_recursively(self):
+        self.src_create('new_dir/sub_dir/file1')
+
+        self.run_command()
+        assert self.dest_has('new_dir/sub_dir/file1')
+
+
+    def test_should_not_update_when_newer_file_exists_already(self):
+        self.src_create('file1')
+        self.dest_create('file1')
+        self.set_dest_newer('file1')
+
+        self.run_command()
+        assert_that(self.content_of('file1'), is_(self.DEST_CONTENT))
+
+
+    def test_should_udpate_when_older_file_exists(self):
+        self.src_create('file1')
+        self.dest_create('file1')
+        self.set_src_newer('file1')
+
+        self.run_command()
+        assert_that(self.content_of('file1'), is_(self.SRC_CONTENT))
+
+
 
 if __name__ == '__main__':
     unittest.main()
