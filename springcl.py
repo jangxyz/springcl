@@ -104,6 +104,10 @@ command_dict = {
 #    return url
 
 
+def camel2sentence(camel):
+    return ''.join([' %s' % letter.lower() if letter.isupper() else letter for letter in camel]).strip()
+
+
 if __name__ == '__main__':
     arg = sys.argv[1]
     cmd = command_dict.get(sys.argv[1], None)
@@ -112,7 +116,9 @@ if __name__ == '__main__':
             cmd(sys.argv[2:]).run()
         #except springcl_commands.Errors.OptionError:
         #    print cmd.usage()
-        except springcl_commands.Errors.Base, e:
-            print e.__class__.__name__ + ':', e.message
-            sys.exit(-1)
+        except Exception, e:
+            msg = camel2sentence(e.__class__.__name__)
+            if e.message:
+                msg += ": %s" % e.message
+            sys.exit(msg)
 
