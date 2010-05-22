@@ -12,7 +12,7 @@ import types
 
 # springcl
 import springcl, springcl_commands
-from springcl_commands import ReadCommand
+from springcl_commands.read_command import ReadCommand, ReadOption
 from springcl_commands import Errors as error
 from springcl import springnote
 
@@ -212,7 +212,8 @@ class FetchPageLocalRemoteTestCase(TestCase):
         if options.get('run_local'):   options['run_remote'] = False
         if options.get('run_remote'):  options['run_local']  = False
         option_mock = mock('option').with_children(**options).raw
-        mock_on(ReadCommand).parse.is_expected.returning(option_mock)
+
+        mock_on(ReadOption).parse.is_expected.returning(option_mock)
 
     def stub_update_local_cache(self):
         mock_on(ReadCommand).update_local_cache
@@ -316,7 +317,7 @@ class FetchPageConvertTitleToIdTestCase(TestCase):
         if options.get('run_remote'):  
             options.update({'run_local': False, 'run_local_on_fail': False})
         option_mock = mock('option').with_children(**options).raw
-        mock_on(ReadCommand).parse.is_expected.returning(option_mock)
+        mock_on(ReadOption).parse.is_expected.returning(option_mock)
 
 
     def test_is_title_option_searches_for_title_first_to_achieve_id(self):
@@ -395,7 +396,7 @@ class FetchPageWithNoteTestCase(TestCase):
         options = default_options.copy()
         options.update(new_options)
         option_mock = mock('option').with_children(**options).raw
-        mock_on(ReadCommand).parse.is_expected.returning(option_mock)
+        mock_on(ReadOption).parse.is_expected.returning(option_mock)
 
     def stub_format(self, text='RAW'):
         mock_on(ReadCommand).format.returning(text)
@@ -429,7 +430,7 @@ class FetchPageWithRevisionTestCase(TestCase):
         options.update(args=[])
         options.update(new_options)
         option_mock = mock('option').with_children(**options).raw
-        mock_on(ReadCommand).parse.is_expected.returning(option_mock)
+        mock_on(ReadOption).parse.is_expected.returning(option_mock)
 
     def stub_format(self, text='RAW'):
         mock_on(ReadCommand).format.returning(text)
@@ -483,7 +484,7 @@ class ReadPathCommandTestCase(TestCase):
         options = default_options.copy()
         options.update(new_options)
         option_mock = mock('option').with_children(**options).raw
-        mock_on(ReadCommand).parse.is_expected.returning(option_mock)
+        mock_on(ReadOption).parse.is_expected.returning(option_mock)
 
     #def test_local_page(self):       pass 
     #def test_local_revision(self):   pass 
@@ -500,7 +501,7 @@ class AuthRemoteTestCase(TestCase):
         options = default_options.copy()
         options.update(new_options)
         option_mock = mock('option').with_children(**options).raw
-        mock_on(ReadCommand).parse.is_expected.returning(option_mock)
+        mock_on(ReadOption).parse.is_expected.returning(option_mock)
 
     def run_command(self):
         ReadCommand(['123']).run()
@@ -541,7 +542,6 @@ class AuthRemoteTestCase(TestCase):
 
 class UpdateRemoteResourceTestCase(TestCase):
     pass
-
 
 
 if __name__ == '__main__':
