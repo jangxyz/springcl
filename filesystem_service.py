@@ -38,6 +38,7 @@ class FileSystemService(Service):
          * /pages.json?domain=jangxyz     => /jangxyz/
          * /pages/563954/revisions.json   => /default/563954/revisions/
          * /pages/563954/attachments.json => /default/563954/attachments/
+         * /pages/563954/comments.json    => /default/563954/comments/
 
         get
          * /pages/563954.json?domain=jangxyz     => /jangxyz/563954/563954.json

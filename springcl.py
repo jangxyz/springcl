@@ -116,9 +116,12 @@ if __name__ == '__main__':
             cmd(sys.argv[2:]).run()
         #except springcl_commands.Errors.OptionError:
         #    print cmd.usage()
-        except Exception, e:
-            msg = camel2sentence(e.__class__.__name__)
-            if e.message:
-                msg += ": %s" % e.message
-            sys.exit(msg)
+
+        #except Exception, e:
+        #    msg = camel2sentence(e.__class__.__name__)
+        #    if e.message:
+        #        msg += ": %s" % e.message
+        #    sys.exit(msg)
+        finally:
+            pass
 
