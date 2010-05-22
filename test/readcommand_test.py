@@ -176,7 +176,6 @@ class LoadSn(TestCase):
         ReadCommand(['123']).run()
 
     def test_loads_sn(self):
-
         mock_on(springnote).Springnote.is_expected.raising(StopTesting)
         self.assertRaises(StopTesting, lambda: self.run_command())
 
@@ -214,7 +213,10 @@ class FetchPageLocalRemoteTestCase(TestCase):
         if options.get('run_remote'):  options['run_local']  = False
         option_mock = mock('option').with_children(**options).raw
         mock_on(ReadCommand).parse.is_expected.returning(option_mock)
-    
+
+    def stub_update_local_cache(self):
+        mock_on(ReadCommand).update_local_cache
+
     def test_access_locally_with_local_option(self):
         ''' sn.service used in Page.get is instance of FileSystemService '''
         self.stub_parse(run_local=True, run_remote_on_fail=False)
@@ -226,6 +228,7 @@ class FetchPageLocalRemoteTestCase(TestCase):
 
     def test_access_remote_after_local_if_not_found(self):
         self.stub_parse(run_local=True, run_remote_on_fail=True)
+        self.stub_update_local_cache()
 
         self.prev_service_called = None
         def sn_has_local_then_remote_service(*args, **kw):
@@ -241,26 +244,31 @@ class FetchPageLocalRemoteTestCase(TestCase):
             self.prev_service_called = service
             return is_correct_type
         def raise_exception_only_at_local(*args, **kwargs):
-            page = mock('page').with_methods('get').raw
-            if   is_local_service( args[0].service): raise  FileNotExist
-            elif is_remote_service(args[0].service): return page
-            else:
-                self.fail("%s is not an allowed type" % type(args[0].service))
+            if is_local_service( args[0].service): 
+                raise FileNotExist
+            if is_remote_service(args[0].service): 
+                m_Page = mock('Page mock').with_methods('get').raw
+                return m_Page
+            self.fail("%s is not an allowed type" % type(args[0].service))
 
-        mock_on(springnote).Page.is_expected.twice() \
+        mock_on(springnote).Page.is_expected.twice()    \
             .where_(sn_has_local_then_remote_service)   \
             .with_action(raise_exception_only_at_local)
 
         self.run_command()
 
+
     def test_access_remotely_with_remote_option(self):
         self.stub_parse(run_remote=True)
+        self.stub_update_local_cache()
 
         ## only REMOTE should be called
         sn_has_remote_service = lambda *args, **kw: is_remote_service(args[0].service)
-        mock_on(springnote).Page.is_expected.once().where_(sn_has_remote_service)
+        mock_on(springnote).Page.is_expected.once() \
+            .where_(sn_has_remote_service)          \
+            .raising(StopTesting)
 
-        self.run_command()
+        self.assertRaises(StopTesting, lambda: self.run_command())
 
     def test_get_page_remotely_then_locally_if_failed_given_remote_local_option(self):
         self.stub_parse(run_remote=True, run_local_on_fail=True)

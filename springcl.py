@@ -1,15 +1,10 @@
 #!/usr/bin/python
 
-import springnote, filesystem_service
 import springcl_commands
+import springnote, filesystem_service
 import sys
 
-#
-# springnote constants
-#
-BASE_URL = "http://api.springnote.com"
-
-commands = {
+command_dict = {
     'read': springcl_commands.ReadCommand,
 }
 
@@ -96,6 +91,7 @@ def parse(arguments):
     return result
 
 
+BASE_URL = "http://api.springnote.com"
 def format_url(options):
     url = BASE_URL
     if options['COMMAND'] == Command.FETCH:
@@ -109,7 +105,7 @@ def format_url(options):
 
 if __name__ == '__main__':
     arg = sys.argv[1]
-    cmd = commands.get(sys.argv[1], None)
+    cmd = command_dict.get(sys.argv[1], None)
     if cmd is not None:
         try:
             cmd(sys.argv[2:]).run()
