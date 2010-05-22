@@ -112,7 +112,7 @@ class FileSystemService(Service):
         else: raise NotImplementedError("not yet")
 
     def read(self):
-        ''' should run after request(), when self.filepath is set '''
+        assert self.filepath, "should run after request()"
         if not os.path.exists(self.filepath):
             raise FileNotExist("%s does not exist" % self.filepath)
 
