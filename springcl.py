@@ -7,6 +7,7 @@ import sys
 command_dict = {
     'read': springcl_commands.ReadCommand,
     'list': springcl_commands.ListCommand,
+    'create': springcl_commands.CreateCommand,
 }
 
 
@@ -109,10 +110,12 @@ def camel2sentence(camel):
 
 
 if __name__ == '__main__':
-    arg = sys.argv[1]
-    cmd = command_dict.get(sys.argv[1], None)
-    if cmd is not None:
-        try:
+    if len(sys.argv) < 2:
+        sys.exit(command_dict.keys())
+    try:
+        cmd = command_dict.get(sys.argv[1], None)
+        if cmd is not None:
+            arg = sys.argv[1]
             cmd(sys.argv[2:]).run()
         #except springcl_commands.Errors.OptionError:
         #    print cmd.usage()
@@ -122,6 +125,6 @@ if __name__ == '__main__':
         #    if e.message:
         #        msg += ": %s" % e.message
         #    sys.exit(msg)
-        finally:
-            pass
+    finally:
+        pass
 
