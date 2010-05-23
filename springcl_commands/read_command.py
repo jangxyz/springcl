@@ -5,6 +5,12 @@ usage = '''
     springcl read [OPTIONS] RESOURCE --attachment ATTACHMENT 
     springcl read [OPTIONS] RESOURCE --attachment ATTACHMENT --file
 ''' 
+options = '''
+    --rev        ID<int>     : revision of page. plain number is exact identifier and numbers starting with + or - is the index
+    --attachment ID<int>     : attachment of page
+    --file => is_file[False] : content of attachment
+'''
+
 '''
 Read
 
@@ -123,5 +129,4 @@ class ReadAttachmentCommand(ReadCommand):
         self.write(self.format(result.raw), options.output)
 
         return result
-
 

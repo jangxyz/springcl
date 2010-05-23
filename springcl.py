@@ -8,6 +8,7 @@ command_dict = {
     'read': springcl_commands.ReadCommand,
     'list': springcl_commands.ListCommand,
     'create': springcl_commands.CreateCommand,
+    'update': springcl_commands.UpdateCommand,
 }
 
 

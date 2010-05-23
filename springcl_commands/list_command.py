@@ -6,6 +6,12 @@ usage = '''
     springcl list [OPTIONS] RESOURCE --revisions
     springcl list [OPTIONS] RESOURCE --pages
 '''
+options = '''
+    --attachments => is_attachments[False] : get attachments of the page
+    --revisions   => is_revisions  [False] : get revisions of the page
+    --pages       => is_pages      [False] : get children pages of the page
+    --comments    => is_comments   [False] : get comments of the page
+'''
 
 from springcl_commands import *
 import springcl_options

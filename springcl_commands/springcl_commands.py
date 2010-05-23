@@ -3,7 +3,7 @@ import os, sys
 
 CONSUMER_TOKEN  = '5aUy7Iz0Rf7RHFflaY2kNQ'
 CONSUMER_SECRET = 'oOTGX5p8v0bmPa2csaprPTbrpbSmEC17Yscn88sSJg'
-BASE_PATH = os.path.expanduser("~/.springcl")
+#BASE_PATH = os.path.expanduser("~/.springcl")
 
 class Errors:
     class Base(Exception):          pass

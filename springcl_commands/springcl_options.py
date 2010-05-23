@@ -26,7 +26,7 @@ class GlobalOption(SpringclOption):
     def _build_parser(cls, parser=None):
         parser = parser or optparse.OptionParser()
 
-        parser.add_option('--basedir', metavar="PATH", default=BASE_PATH, dest="basedir", help='use PATH as local cache basedir')
+        #parser.add_option('--basedir', metavar="PATH", default=BASE_PATH, dest="basedir", help='use PATH as local cache basedir')
         parser.add_option('--output', metavar="FILE", default=None, help='output file')
 
         # local/remote
