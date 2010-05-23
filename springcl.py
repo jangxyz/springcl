@@ -9,6 +9,7 @@ command_dict = {
     'list': springcl_commands.ListCommand,
     'create': springcl_commands.CreateCommand,
     'update': springcl_commands.UpdateCommand,
+    'delete': springcl_commands.DeleteCommand,
 }
 
 
