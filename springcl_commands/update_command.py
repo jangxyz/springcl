@@ -24,7 +24,6 @@ class UpdateOption(springcl_options.SpringclOption):
         p.add_option_group(gl)
 
         #
-        p.add_option('--note', metavar='NOTE', help='specify note name to update resource on')
         p.add_option('--file', metavar='FILE', help='resource file to update with')
 
         # resource type

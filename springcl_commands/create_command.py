@@ -23,7 +23,6 @@ class CreateOption(springcl_options.SpringclOption):
         p.add_option_group(gl)
 
         #
-        p.add_option('--note', metavar='NOTE', help='specify note name to create resource on')
 
         p.add_option('--file', metavar='FILE', help='file to create')
         p.add_option('--parent', metavar='ID', dest="parent_id", type=int, help='id of parent page')

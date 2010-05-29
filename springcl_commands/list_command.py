@@ -27,7 +27,6 @@ class ListOption(springcl_options.SpringclOption):
         p.add_option_group(gl)
 
         #
-        p.add_option('--note', metavar='NOTE', help='specify note name to read resource from')
 
         # resource pointer type
         #p.add_option('--title', action="store_true", dest="is_title", default=False, help='RESOURCE is page title. error if multiple pages found')

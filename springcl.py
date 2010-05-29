@@ -1,17 +1,13 @@
 #!/usr/bin/python
 
 import springcl_commands
-import springnote, filesystem_service
-import sys
+import sys, types
 
-command_dict = {
-    'read': springcl_commands.ReadCommand,
-    'list': springcl_commands.ListCommand,
-    'create': springcl_commands.CreateCommand,
-    'update': springcl_commands.UpdateCommand,
-    'delete': springcl_commands.DeleteCommand,
-}
-
+command_dict = {}
+# dynamically load every subclass of class SpringclCommand
+for class_name in springcl_commands.__all__:
+    command_name = springcl_commands.classname2commandname(class_name)
+    command_dict[command_name] = getattr(springcl_commands, class_name)
 
 ##
 ## springcl constants

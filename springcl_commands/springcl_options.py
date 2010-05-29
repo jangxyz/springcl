@@ -22,12 +22,15 @@ class SpringclOption:
         return options
 
 class GlobalOption(SpringclOption):
+    title = 'Global options'
     @classmethod
     def _build_parser(cls, parser=None):
         parser = parser or optparse.OptionParser()
 
         #parser.add_option('--basedir', metavar="PATH", default=BASE_PATH, dest="basedir", help='use PATH as local cache basedir')
         parser.add_option('--output', metavar="FILE", default=None, help='output file')
+        #
+        parser.add_option('--note', metavar='NOTE', help='specify note name to delete resource on')
 
         # local/remote
         def add_lr_opt(parser, *args, **kwargs):

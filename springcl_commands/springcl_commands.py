@@ -170,6 +170,22 @@ class Errors:
 # springcl commands
 #
 
+def classname2commandname(name):
+    ''' ReadPageCommand -> read-page '''
+    return ''.join(
+        map(
+            lambda ch: '-' + ch.lower() if ch.isupper() else ch, 
+            list(name.partition('Command')[0])
+        )
+    ).lstrip('-')
+        
+def modulename2classname(name):
+    ''' read_page_command -> ReadPageCommand '''
+    return ''.join(
+        map(lambda x: x.title(), name.split('_'))
+    )
+    
+
 def make_sn(auth, consumer=None):
     consumer = consumer or (CONSUMER_TOKEN, CONSUMER_SECRET)
     sn = springnote.Springnote(consumer_token=consumer)

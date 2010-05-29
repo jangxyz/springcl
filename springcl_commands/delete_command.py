@@ -12,7 +12,6 @@ from springcl_commands import *
 import springcl_options
 import optparse
 
-
 class DeleteOption(springcl_options.SpringclOption):
     @classmethod
     def _build_parser(cls):
@@ -23,7 +22,6 @@ class DeleteOption(springcl_options.SpringclOption):
         p.add_option_group(gl)
 
         #
-        p.add_option('--note', metavar='NOTE', help='specify note name to delete resource on')
 
         # resource type
         p.add_option('--attachment', action="store_true", dest="is_attachment", default=False, 
