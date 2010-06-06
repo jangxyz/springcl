@@ -1,8 +1,7 @@
 #!/usr/bin/python
-from springcl_options import SpringclOption
 from springcl_commands import CONSUMER_TOKEN, CONSUMER_SECRET
 
-class GlobalOptions(SpringclOption):
+class GlobalOptions:
     options = '''
         --output FILE[None] : output file
         --note NOTE         : specify note name to delete resource on

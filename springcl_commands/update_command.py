@@ -1,42 +1,21 @@
 #!/usr/bin/python
-usage = '''
-    springcl update [OPTIONS]              RESOURCE --file FILE
-    springcl update [OPTIONS] --attachment RESOURCE --file FILE --parent ID
-'''
-options = '''
-    --file FILE                          : resource file
-    --attachment => is_attachment[False] : update attachment (default is page)
-    --parent ID  => parent_id<int>       : parent page id (only for attachment)
-'''
-
 from springcl_commands import *
-import springcl_options
-import optparse
-
-
-class UpdateOption(springcl_options.SpringclOption):
-    @classmethod
-    def _build_parser(cls):
-        p = optparse.OptionParser(usage=usage)
-
-        gl = optparse.OptionGroup(p, 'Global options')
-        springcl_options.GlobalOption._build_parser(gl)
-        p.add_option_group(gl)
-
-        #
-        p.add_option('--file', metavar='FILE', help='resource file to update with')
-
-        # resource type
-        p.add_option('--attachment', action="store_true", dest="is_attachment", default=False, 
-                                               help='update attachment')
-        p.add_option('--parent', metavar='ID', dest="parent_id", type=int, help='id of parent page')
-
-        return p
-
+import simple_options
 
 class UpdateCommand(SpringclCommand):
+    usage = '''
+        springcl update [OPTIONS]              RESOURCE --file FILE
+        springcl update [OPTIONS] --attachment RESOURCE --file FILE --parent ID
+    '''
+    options = '''
+        --file FILE                          : resource file
+        --attachment => is_attachment[False] : update attachment (default is page)
+        --parent ID  => parent_id<int>       : parent page id (only for attachment)
+        
+        [Global Options]
+    '''
     def __init__(self, opt_list=[]):
-        self.options = UpdateOption.parse(opt_list)
+        self.options = simple_options.parse(self.usage, self.options, opt_list)
         if self.options.file is None:
             raise Errors.OptionError("should give file to update")
         if len(self.options.args) is 0:
@@ -50,9 +29,15 @@ class UpdateCommand(SpringclCommand):
         return cmd(self.options).run()
 
 
-class UpdatePageCommand(UpdateCommand):
-    def __init__(self, options):
-        self.options = options
+class UpdatePageCommand(SpringclCommand):
+    usage = 'springcl update-page [OPTIONS] RESOURCE'
+    options = '''
+        [Global Options]
+    '''
+    def __init__(self, opt_list=[]):
+        self.options = simple_options.parse(self.usage, self.options, opt_list)
+        if len(self.options.args) is 0:
+            raise Errors.OptionError('needs resource argument')
 
     def request(self, sn):
         note = self.options.note
@@ -79,11 +64,21 @@ class UpdatePageCommand(UpdateCommand):
         return result
 
 
-class UpdateAttachmentCommand(UpdateCommand):
-    def __init__(self, options):
-        self.options = options
-        if self.options.parent_id is None:
-            raise optparse.OptionValueError("requires parent id")
+
+class UpdateAttachmentCommand(SpringclCommand):
+    usage = 'springcl update-attachment [OPTIONS] RESOURCE --file FILE --parent ID'
+    options = '''
+        --file FILE                         : resource file
+        --parent ID => parent_id<int>       : parent page id (only for attachment)
+        
+        [Global Options]
+    '''
+    def __init__(self, opt_list=[]):
+        self.options = simple_options.parse(self.usage, self.options, opt_list)
+        if self.options.file is None:
+            raise Errors.OptionError("should give file to update")
+        if len(self.options.args) is 0:
+            raise Errors.OptionError('needs resource argument')
 
     def request(self, sn):
         note, file, parent_id = self.options.note, self.options.file, self.options.parent_id

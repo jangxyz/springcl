@@ -1,49 +1,26 @@
 #!/usr/bin/python
-usage = '''
-    springcl list [OPTIONS] RESOURCE
-    springcl list [OPTIONS] RESOURCE --attachments
-    springcl list [OPTIONS] RESOURCE --comments
-    springcl list [OPTIONS] RESOURCE --revisions
-    springcl list [OPTIONS] RESOURCE --pages
-'''
-options = '''
-    --attachments => is_attachments[False] : get attachments of the page
-    --revisions   => is_revisions  [False] : get revisions of the page
-    --pages       => is_pages      [False] : get children pages of the page
-    --comments    => is_comments   [False] : get comments of the page
-'''
 
 from springcl_commands import *
-import springcl_options
-import optparse
-
-class ListOption(springcl_options.SpringclOption):
-    @classmethod
-    def _build_parser(cls):
-        p = optparse.OptionParser(usage=usage)
-
-        gl = optparse.OptionGroup(p, 'Global options')
-        springcl_options.GlobalOption._build_parser(gl)
-        p.add_option_group(gl)
-
-        #
-
-        # resource pointer type
-        #p.add_option('--title', action="store_true", dest="is_title", default=False, help='RESOURCE is page title. error if multiple pages found')
-        #p.add_option('--id',    action="store_true", dest="is_id",    default=False, help='RESOURCE is page id. error if non numeric')
-        #p.add_option('--format', help='specify format in action')
-
-        # resource type
-        p.add_option('--attachments', action="store_true", dest="is_attachments", default=False, help='get attachments of the page')
-        p.add_option('--revisions'  , action="store_true", dest="is_revisions"  , default=False, help='get revisions of the page')
-        p.add_option('--pages'      , action="store_true", dest="is_pages"      , default=False, help='get children pages of the page')
-        p.add_option('--comments'   , action="store_true", dest="is_comments"   , default=False, help='get comments of the page')
-
-        return p
+import simple_options
 
 class ListCommand(SpringclCommand):
+    usage = '''
+        springcl list [OPTIONS] RESOURCE
+        springcl list [OPTIONS] RESOURCE --attachments
+        springcl list [OPTIONS] RESOURCE --comments
+        springcl list [OPTIONS] RESOURCE --revisions
+        springcl list [OPTIONS] RESOURCE --pages
+    '''
+    options = '''
+        --attachments => is_attachments[False] : get attachments of the page
+        --revisions   => is_revisions  [False] : get revisions of the page
+        --pages       => is_pages      [True]  : get children pages of the page
+        --comments    => is_comments   [False] : get comments of the page
+
+        [Global Options]
+    '''
     def __init__(self, opt_list=[]):
-        self.options = ListOption.parse(opt_list)
+        self.options = simple_options.parse(self.usage, self.options, opt_list)
         if len(self.options.args) is 0:
             raise Errors.OptionError('needs resource argument')
 
@@ -51,10 +28,10 @@ class ListCommand(SpringclCommand):
         ''' figure out proper subcommand and delegate to it '''
         options = self.options
 
-        if options.is_attachments: cmd = ListAttachmentsCommand
-        elif options.is_revisions: cmd = ListRevisionsCommand
-        elif options.is_comments:  cmd = ListCommentsCommand
-        else:                      cmd = ListPagesCommand
+        if   options.is_attachments: cmd = ListAttachmentsCommand()
+        elif options.is_revisions:   cmd = ListRevisionsCommand()
+        elif options.is_comments:    cmd = ListCommentsCommand()
+        else:                        cmd = ListPagesCommand()
 
         # run 
         page_id = int(self.options.args[0])
@@ -71,23 +48,81 @@ class ListCommand(SpringclCommand):
         return results
 
 
+def init_command(self, opt_list, options):
+    if options: 
+        self.options = options
+    else:
+        self.options = simple_options.parse(self.usage, self.options, opt_list)
+        if self.options.file is None:
+            raise Errors.OptionError('needs resource argument')
+
+def run_command(self):
+    options = self.options
+
+    # run 
+    page_id = int(self.options.args[0])
+    fetch   = lambda sn: cmd.fetch(sn, page_id, options.note)
+    results = self.try_fetch(fetch, options)
+
+    # read
+    for result in results:
+        result.raw = result.raw.encode('utf-8')
+        self.write(self.format(result.raw), options.output)
+
+    return results
+
+
 class ListPagesCommand(ListCommand):
-    @classmethod
+    usage   = 'springcl list-pages [OPTIONS] RESOURCE'
+    options = '''
+        [Global Options]
+    '''
+    def __init__(self, opt_list=[], options=None): 
+        init_command(self, opt_list, options)
+    def run(self): 
+        return run_command(self)
+
     def fetch(cls, sn, id, note):
         return springnote.Page(sn, id=id, note=note).get_children()
 
+
 class ListRevisionsCommand(ListCommand):
-    @classmethod
+    usage   = 'springcl list-revisions [OPTIONS] RESOURCE'
+    options = '''
+        [Global Options]
+    '''
+    def __init__(self, opt_list=[], options=None): 
+        init_command(self, opt_list, options)
+    def run(self): 
+        return run_command(self)
+
     def fetch(self, sn, page_id, note):
         return springnote.Page(sn, id=page_id, note=note).list_revisions()
 
 class ListAttachmentsCommand(ListCommand):
-    @classmethod
+    usage   = 'springcl list-attachments [OPTIONS] RESOURCE'
+    options = '''
+        [Global Options]
+    '''
+    def __init__(self, opt_list=[], options=None): 
+        init_command(self, opt_list, options)
+    def run(self): 
+        return run_command(self)
+    
     def fetch(self, sn, id, note):
         return springnote.Page(sn, id=id, note=note).list_attachments()
 
 class ListCommentsCommand(ListCommand):
-    @classmethod
+    usage   = 'springcl list-comments [OPTIONS] RESOURCE'
+    options = '''
+        [Global Options]
+    '''
+    def __init__(self, opt_list=[], options=None): 
+        init_command(self, opt_list, options)
+    def run(self): 
+        return run_command(self)
+
     def fetch(self, sn, id, note):
         return springnote.Page(sn, id=id, note=note).list_comments()
+
 

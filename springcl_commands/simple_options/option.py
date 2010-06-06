@@ -24,6 +24,7 @@ __all__ = [
     'Option', 
     'GroupOption',
     'Parser',
+    'parse',  # sugar for Parser().parse()
 ]
 
 def is_surrounded_by(line, prefix, suffix):
@@ -92,7 +93,7 @@ class Option(BaseOption):
         args, kwargs = [], {}
 
         is_valid = lambda x: x is not None
-        if self.opt:
+        if self.opt and not isinstance(self.opt, NullOption):
             # opt
             if is_valid(self.opt.long):
                 args.append('--' + self.opt.long)
@@ -100,7 +101,7 @@ class Option(BaseOption):
             if is_valid(self.opt.metavar):
                 kwargs['metavar'] = self.opt.metavar
 
-        if self.dest:
+        if self.dest and not isinstance(self.dest, NullOption):
             # dest
             if   is_valid(self.dest.varname): kwargs['dest'] = self.dest.varname
             elif is_valid(self.opt.metavar):  kwargs['dest'] = self.opt.metavar
@@ -117,8 +118,9 @@ class Option(BaseOption):
                 else:
                     kwargs['type'] = self.dest.type
 
-        if self.help and is_valid(self.help.msg):
-            kwargs['help'] = self.help.msg
+        if self.help and not isinstance(self.help, NullOption) and \
+           is_valid(self.help.msg):
+                kwargs['help'] = self.help.msg
 
         parser.add_option(*args, **kwargs)
 
@@ -236,10 +238,11 @@ class GroupOption(BaseOption):
         cls._build_parser(option_group)
         parser.add_option_group(option_group)
 
+def parse(usage='', options=None, args=[]):
+    return Parser(usage, options).parse(args)
 class Parser:
-    def __init__(self, usage='', options=None, groups=[]):
+    def __init__(self, usage='', options=None):
         self.usage  = usage.strip()
-        self.groups = groups
         
         self.options = []
         for option_str in options.strip().split("\n"):
@@ -253,44 +256,6 @@ class Parser:
 
         for option in self.options:
             option.add_option(parser)
-
-            #args, kwargs = [], {}
-
-            #if option.opt:
-            #    # 
-            #    if is_valid(option.opt.long):
-            #        args.append('--' + option.opt.long)
-            #    # metavar
-            #    if is_valid(option.opt.metavar):
-            #        kwargs['metavar'] = option.opt.metavar
-
-            #if option.dest:
-            #    # dest
-            #    if   is_valid(option.dest.varname): kwargs['dest'] = option.dest.varname
-            #    elif is_valid(option.opt.metavar):  kwargs['dest'] = option.opt.metavar
-
-            #    # default
-            #    if is_valid(option.dest.default):
-            #        kwargs['default'] = option.dest.default
-            #    # action, type
-            #    if is_valid(option.dest.type):
-            #        # bool is different
-            #        if option.dest.type is bool:
-            #            default = option.dest.default
-            #            kwargs['action'] = 'store_' + `not default`.lower()
-            #        else:
-            #            kwargs['type'] = option.dest.type
-
-            #if option.help and is_valid(option.help.msg):
-            #    kwargs['help'] = option.help.msg
-
-            #parser.add_option(*args, **kwargs)
-
-        ## option groups
-        #for group in self.groups:
-        #    option_group = optparse.OptionGroup(parser, group.title)
-        #    group._build_parser(option_group)
-        #    parser.add_option_group(option_group)
 
         return parser
 
