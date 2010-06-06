@@ -20,6 +20,11 @@
 #'''
 import optparse, types
 
+__all__ = [ 
+    'Option', 
+    'GroupOption',
+    'Parser',
+]
 
 def is_surrounded_by(line, prefix, suffix):
     prefix_idx = line.find(prefix)

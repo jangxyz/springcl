@@ -1,6 +1,6 @@
 #!/usr/bin/python
 from springcl_commands import *
-import springcl_options, option
+import springcl_options, simple_options
 
 class DeleteAttachmentCommand(SpringclCommand):
     usage = '''
@@ -14,7 +14,7 @@ class DeleteAttachmentCommand(SpringclCommand):
     '''
 
     def __init__(self, opt_list=[]):
-        self.options = option.Parser(self.usage, self.options).parse(opt_list)
+        self.options = simple_options.Parser(self.usage, self.options).parse(opt_list)
         if len(self.options.args) is 0:
             raise Errors.OptionError('needs resource argument')
         if self.options.parent_id is None:
