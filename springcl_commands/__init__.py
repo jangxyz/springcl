@@ -24,4 +24,3 @@ for file in filter(lambda x: x.endswith('.py'), os.listdir(dirname)):
         locals()[class_name] = cls
         __all__.append(class_name)
 
-

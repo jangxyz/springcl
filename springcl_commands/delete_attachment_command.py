@@ -9,12 +9,12 @@ class DeleteAttachmentCommand(SpringclCommand):
     options = '''
         --attachment => is_attachment[False] : delete attachment (default is page)
         --parent ID  => parent_id<int>       : parent page id (only for attachment)
+
+        [Global Options]
     '''
 
     def __init__(self, opt_list=[]):
-        self.options = option.Parser(self.usage, self.options, 
-            groups=[springcl_options.GlobalOption]).parse(opt_list)
-        #self.options = DeleteAttachmentOption.parse(opt_list)
+        self.options = option.Parser(self.usage, self.options).parse(opt_list)
         if len(self.options.args) is 0:
             raise Errors.OptionError('needs resource argument')
         if self.options.parent_id is None:
