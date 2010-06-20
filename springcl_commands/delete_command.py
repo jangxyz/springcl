@@ -57,11 +57,10 @@ class DeletePageCommand(SpringclCommand):
 
 class DeleteAttachmentCommand(SpringclCommand):
     usage = '''
-        springcl delete_attachment [OPTIONS] --attachment RESOURCE --parent ID
+        springcl delete-attachment [OPTIONS] RESOURCE --parent ID
     '''
     options = '''
-        --attachment => is_attachment[False] : delete attachment (default is page)
-        --parent ID  => parent_id<int>       : parent page id (only for attachment)
+        --parent ID  => parent_id<int>       : parent page id
 
         [Global Options]
     '''

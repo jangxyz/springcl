@@ -261,6 +261,8 @@ class Parser:
 
     def parse(self, args):
         ''' parse input '''
+        if isinstance(args, str): args = args.split()
+
         parser = self._build()
         options, args = parser.parse_args(args)
         options.args = args

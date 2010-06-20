@@ -13,24 +13,18 @@ for file in filter(lambda x: x.endswith('.py'), os.listdir(dirname)):
     if file == '__init__.py':
         continue
     module_name = file.partition('.py')[0]
-    #class_name  = modulename2classname(module_name)
-    #try:
-    #    mod = __import__(module_name, globals(), locals())
-    #    cls = getattr(mod, class_name)
-    #except AttributeError:
-    #    continue
     mod = __import__(module_name, globals(), locals())
     for cls_name in dir(mod):
         cls = getattr(mod, cls_name)
         if not inspect.isclass(cls):
             continue
-
         # set imported class
         if issubclass(cls, SpringclCommand):
             if cls_name not in __all__:
                 locals()[cls_name] = cls
                 __all__.append(cls_name)
 
+# del
 for var in dir():
     if var == 'inspect':
         continue

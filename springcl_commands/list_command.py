@@ -53,15 +53,13 @@ def init_command(self, opt_list, options):
         self.options = options
     else:
         self.options = simple_options.parse(self.usage, self.options, opt_list)
-        if self.options.file is None:
-            raise Errors.OptionError('needs resource argument')
 
 def run_command(self):
     options = self.options
 
     # run 
     page_id = int(self.options.args[0])
-    fetch   = lambda sn: cmd.fetch(sn, page_id, options.note)
+    fetch   = lambda sn: self.fetch(sn, page_id, options.note)
     results = self.try_fetch(fetch, options)
 
     # read

@@ -6,13 +6,13 @@ import simple_options
 class ReadCommand(SpringclCommand):
     usage = '''
         springcl read [OPTIONS] RESOURCE
-        springcl read [OPTIONS] RESOURCE --attachment ATTACHMENT 
-        springcl read [OPTIONS] RESOURCE --attachment ATTACHMENT --file
+        springcl read [OPTIONS] RESOURCE --parent ID 
+        springcl read [OPTIONS] RESOURCE --parent ID --download
     ''' 
     options = '''
-        --rev        ID<int>     : revision of page. plain number is exact identifier and numbers starting with + or - is the index
-        --attachment ID<int>     : attachment of page
-        --file => is_file[False] : content of attachment
+        --rev    ID<int>              : revision of page. plain number is exact identifier and numbers starting with + or - is the index
+        --parent ID => parent_id<int> : parent page id (only for attachment)
+        --download  => is_file[False] : content of attachment
 
         [Global Options]
     '''
@@ -24,8 +24,8 @@ class ReadCommand(SpringclCommand):
     def run(self):
         ''' figure out proper subcommand and delegate to it '''
         options = self.options
-        if   options.attachment: cmd = ReadAttachmentCommand(options)
-        else:                    cmd = ReadPageCommand(options)
+        if   options.parent_id: cmd = ReadAttachmentCommand(options)
+        else:                   cmd = ReadPageCommand(options)
 
         return cmd.run()
 
@@ -35,11 +35,14 @@ def init_command(self, opt_list, options):
         self.options = options
     else:
         self.options = simple_options.parse(self.usage, self.options, opt_list)
-        if self.options.file is None:
-            raise Errors.OptionError('needs resource argument')
+        #if self.options.file is None:
+        #    raise Errors.OptionError('needs resource argument')
 
-class ReadPageCommand(ReadCommand):
-    usage = 'springcl read [OPTIONS] RESOURCE' 
+class ReadPageCommand(SpringclCommand):
+    usage = '''
+        springcl read-page [OPTIONS] RESOURCE
+        springcl read-page [OPTIONS] RESOURCE --rev ID
+    '''
     options = '''
         --rev ID<int> : revision of page. plain number is exact identifier and numbers starting with + or - is the index
 
@@ -70,14 +73,14 @@ class ReadPageCommand(ReadCommand):
         return result
 
 
-class ReadAttachmentCommand(ReadCommand):
+class ReadAttachmentCommand(SpringclCommand):
     usage = '''
-        springcl read [OPTIONS] RESOURCE --attachment ATTACHMENT 
-        springcl read [OPTIONS] RESOURCE --attachment ATTACHMENT --file
+        springcl read-attachment [OPTIONS] RESOURCE --parent ID
+        springcl read-attachment [OPTIONS] RESOURCE --parent ID --download
     ''' 
     options = '''
-        --attachment ID<int>     : attachment of page
-        --file => is_file[False] : content of attachment
+        --parent ID => parent_id<int> : parent page id
+        --download  => is_file[False] : content of attachment
 
         [Global Options]
     '''
@@ -99,8 +102,9 @@ class ReadAttachmentCommand(ReadCommand):
         options   = self.options
 
         # fetch
-        page_id   = int(options.args[0])
-        attach_id = options.attachment
+        page_id   = options.parent_id
+        attach_id = int(options.args[0])
+
         fetch  = lambda sn: self.fetch(sn, options.note, page_id, attach_id, options.is_file)
         result = self.try_fetch(fetch_method=fetch, options=options)
 
@@ -108,5 +112,4 @@ class ReadAttachmentCommand(ReadCommand):
         self.write(self.format(result.raw), options.output)
 
         return result
-
 

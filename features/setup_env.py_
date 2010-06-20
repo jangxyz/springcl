@@ -1,0 +1,14 @@
+#!/usr/bin/python
+
+@Given("아무 것도 없을 때")
+def do_nothing():
+    pass
+
+@When("로컬에서 (.*)을 하면")
+def local_call(cmd):
+    print cmd
+
+@Then("다음 디렉토리들이 생성되어야 한다")
+def test_directories_created():
+    pass
+

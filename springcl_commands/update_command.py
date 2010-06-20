@@ -30,8 +30,9 @@ class UpdateCommand(SpringclCommand):
 
 
 class UpdatePageCommand(SpringclCommand):
-    usage = 'springcl update-page [OPTIONS] RESOURCE'
+    usage = 'springcl update-page [OPTIONS] RESOURCE --file FILE'
     options = '''
+        --file FILE: resource file
         [Global Options]
     '''
     def __init__(self, opt_list=[]):
@@ -66,7 +67,7 @@ class UpdatePageCommand(SpringclCommand):
 
 
 class UpdateAttachmentCommand(SpringclCommand):
-    usage = 'springcl update-attachment [OPTIONS] RESOURCE --file FILE --parent ID'
+    usage = 'springcl update-attachment [OPTIONS] RESOURCE --parent ID --file FILE'
     options = '''
         --file FILE                         : resource file
         --parent ID => parent_id<int>       : parent page id (only for attachment)

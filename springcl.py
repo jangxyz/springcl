@@ -9,6 +9,14 @@ for class_name in springcl_commands.__all__:
     command_name = springcl_commands.classname2commandname(class_name)
     command_dict[command_name] = getattr(springcl_commands, class_name)
 
+# dynamicaly bind methods
+for k,v in command_dict.iteritems():
+    locals()[k] = v
+
+# tmp
+#locals()['init'] = lambda *args: args
+
+
 ##
 ## springcl constants
 ##

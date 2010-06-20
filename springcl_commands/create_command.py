@@ -31,8 +31,8 @@ class CreatePageCommand(SpringclCommand):
         springcl create-page [OPTIONS] --file FILE
     '''
     options = '''
-        --file FILE                          : resource file
-        --parent ID  => parent_id<int>       : parent page id. default to root
+        --file FILE						: resource file
+        --parent ID  => parent_id<int>  : parent page id. default to root
         
         [Global Options]
     '''
@@ -48,7 +48,7 @@ class CreatePageCommand(SpringclCommand):
         options = self.options
         parent_id = options.parent_id
 
-        f = open(optoins.file)
+        f = open(options.file)
         content = f.read()
         f.close()
 
