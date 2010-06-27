@@ -17,14 +17,14 @@
                 => dest_var <dest_type>
         HELP  = : help_message
         GROUP = \[group_name\]
-#'''
+'''
 import optparse, types
 
 __all__ = [ 
     'Option', 
     'GroupOption',
     'Parser',
-    'parse',  # sugar for Parser().parse()
+    'parse',  # short for Parser().parse()
 ]
 
 def is_surrounded_by(line, prefix, suffix):
@@ -238,16 +238,12 @@ class GroupOption(BaseOption):
         cls._build_parser(option_group)
         parser.add_option_group(option_group)
 
-def parse(usage='', options=None, args=[]):
-    return Parser(usage, options).parse(args)
+
 class Parser:
     def __init__(self, usage='', options=None):
-        self.usage  = usage.strip()
-        
-        self.options = []
-        for option_str in options.strip().split("\n"):
-            option = Option.build(option_str)
-            self.options.append(option)
+        self.usage = usage.strip()
+        options = options.strip()
+        self.options = [Option.build(opt_str) for opt_str in options.split("\n")]
 
     def _build(self):
         ''' bulids option parser '''
@@ -268,4 +264,6 @@ class Parser:
         options.args = args
         return options
 
+def parse(usage='', options=None, args=[]):
+    return Parser(usage, options).parse(args)
 

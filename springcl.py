@@ -1,7 +1,11 @@
 #!/usr/bin/python
 
-import springcl_commands
 import sys, types
+
+from config import *
+import springcl_commands
+
+from util import *
 
 command_dict = {}
 # dynamically load every subclass of class SpringclCommand
