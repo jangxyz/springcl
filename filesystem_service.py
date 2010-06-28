@@ -36,14 +36,15 @@ class FileSystemService(Service):
         list (omitting host http://api.springnote.com/)
          * /pages.json                    => /default/
          * /pages.json?domain=jangxyz     => /jangxyz/
-         * /pages/563954/revisions.json   => /default/563954/revisions/
-         * /pages/563954/attachments.json => /default/563954/attachments/
-         * /pages/563954/comments.json    => /default/563954/comments/
+         * /pages/563954/revisions.json   => /default/pages/563954/revisions/
+         * /pages/563954/attachments.json => /default/pages/563954/attachments/
+         * /pages/563954/comments.json    => /default/pages/563954/comments/
 
         get
-         * /pages/563954.json?domain=jangxyz     => /jangxyz/563954/563954.json
-         * /pages/563954/revisions/29685883.json => /default/563954/revisions/29685883.json
-         * /pages/563954/attachments/559756.json => /default/563954/attachments/559756.json
+         * /pages/563954.json?domain=jangxyz     => /jangxyz/pages/563954/563954/json
+         * /pages/563954/revisions/29685883.json => /default/pages/563954/revisions/29685883/json
+         * /pages/563954/attachments/559756.json => /default/pages/563954/attachments/559756/json
+         * /pages/563954/attachments/559756      => /default/pages/563954/attachments/559756/file
         '''
         # extract path and query from url
         _scheme, _netloc, path, query, _fragment = httplib.urlsplit(url)
@@ -55,8 +56,8 @@ class FileSystemService(Service):
 
         resource_dict = {}
         l = filter(None, path.split('/'))
-        for resource, r_id in zip(l[::2], l[1::2] + [None]):
-            resource_dict[resource] = r_id or True
+        for resource, rsrc_id in zip(l[::2], l[1::2] + [None]):
+            resource_dict[resource] = rsrc_id or True
         resource_dict.pop('pages')
 
         return self.build_path(id, domain, format, **resource_dict)
@@ -68,15 +69,14 @@ class FileSystemService(Service):
 
          * (id=None, note=None)     /default/
          * (id=None)                /jangxyz/
-         *                          /jangxyz/563954/563954.json
-         * ({revisions=True})       /default/563954/revisions/
-         * ({attachments=True})     /default/563954/attachments/
-         * ({revisions=29685883})   /default/563954/revisions/29685883.json
-         * ({attachments=559756)})  /default/563954/attachments/559756.json
+         *                          /jangxyz/pages/563954/563954/json
+         * ({revisions=True})       /default/pages/563954/revisions/
+         * ({attachments=True})     /default/pages/563954/attachments/
+         * ({revisions=29685883})   /default/pages/563954/revisions/29685883/json
+         * ({attachments=559756)})  /default/pages/563954/attachments/559756/json
         '''
         note = note or DEFAULT_NOTE_DIRNAME
-        if format: format = '.' + format
-        if format is None: format = '.json'
+        if format is None: format = 'json'
         for non_key in filter(lambda k: resources[k] is None, resources):
             del resources[non_key]
 
@@ -87,16 +87,22 @@ class FileSystemService(Service):
         if not id: return filepath
 
         # /jangxyz/563954
-        filepath += str(id) + os.path.sep
+        filepath += "pages/%(id)s/" % locals()
 
         # GET page: /jangxyz/563954/563954.json
         if len(resources) is 0:
-            filepath += str(id) + format
+            filepath += format
         # subresources
         else:
-            for r_name, r_id in resources.iteritems():
-                filepath += r_name + os.path.sep                    # LIST
-                if r_id is not True: filepath += str(r_id) + format # GET
+            for rsrc_name, rsrc_id in resources.iteritems():
+                # LIST
+                filepath += "%(rsrc_name)s/" % locals()
+                # GET
+                if rsrc_id is not True:
+                    if rsrc_name == 'attachments' and format == '':
+                        filepath += "%(rsrc_id)s/file" % locals()
+                    else:
+                        filepath += "%(rsrc_id)s/%(format)s" % locals()
 
         return filepath
 

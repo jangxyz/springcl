@@ -11,23 +11,9 @@ import sys, os; sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__f
 
 import filesystem_service
 from filesystem_service import FileSystemService
-import simplejson as json
+from springnote import json
 
 class ParseUrlTestCase(unittest.TestCase):
-    '''
-        list (omitting host http://api.springnote.com/)
-         * /pages.json                    => /default/
-         * /pages.json?domain=jangxyz     => /jangxyz/
-         * /pages/563954/revisions.json   => /default/563954/revisions/
-         * /pages/563954/attachments.json => /default/563954/attachments/
-         * /pages/563954/comments.json    => /default/563954/comments/
-
-        get
-         * /pages/563954.json?domain=jangxyz     => /jangxyz/563954/563954.json
-         * /pages/563954/revisions/29685883.json => /default/563954/revisions/29685883.json
-         * /pages/563954/attachments/559756.json => /default/563954/attachments/559756.json
-         * /pages/563954/attachments/559756      => /default/563954/attachments/559756
-    '''
     def setUp(self):    
         self.service = FileSystemService("/home/jangxyz/.springcl")
 
@@ -35,40 +21,54 @@ class ParseUrlTestCase(unittest.TestCase):
         return self.service.parse_url(url)
 
     def test_parsed_url_starts_with_base_dir(self):
+        ''' * http://api.springnote.com/pages.json => /home/jangxyz/.springcl/.. '''
         url = "http://api.springnote.com/pages.json"
         assert_that(self.parse(url), starts_with("/home/jangxyz/.springcl/"))
 
     def test_list_page(self):
+        ''' * /pages.json                    => /default/ '''
         url = "http://api.springnote.com/pages.json"
         assert_that(self.parse(url), ends_with("/default/"))
-
+    
     def test_list_page_with_domain(self):
+        ''' * /pages.json?domain=jangxyz     => /jangxyz/ '''
         url = "http://api.springnote.com/pages.json?domain=jangxyz"
         assert_that(self.parse(url), ends_with("/jangxyz/"))
 
     def test_get_page(self):
+        ''' * /pages/563954.json?domain=jangxyz     => /jangxyz/pages/563954/json '''
         url = "http://api.springnote.com/pages/563954.json?domain=jangxyz"
-        assert_that(self.parse(url), ends_with("/jangxyz/563954/563954.json"))
+        assert_that(self.parse(url), ends_with("/jangxyz/pages/563954/json"))
 
     def test_list_revision(self):
+        ''' * /pages/563954/revisions.json   => /default/pages/563954/revisions/ '''
         url = "/pages/563954/revisions.json"
-        assert_that(self.parse(url), ends_with("/default/563954/revisions/"))
+        assert_that(self.parse(url), ends_with("/default/pages/563954/revisions/"))
+
+    def test_list_comment(self):
+        ''' * /pages/563954/comments.json    => /default/pages/563954/comments/ '''
+        url = "/pages/563954/comments.json"
+        assert_that(self.parse(url), ends_with("/default/pages/563954/comments/"))
 
     def test_get_revision(self):
+        ''' * /pages/563954/revisions/29685883.json => /default/pages/563954/revisions/29685883/json '''
         url = "/pages/563954/revisions/29685883.json"
-        assert_that(self.parse(url), ends_with("/default/563954/revisions/29685883.json"))
+        assert_that(self.parse(url), ends_with("/default/pages/563954/revisions/29685883/json"))
     
     def test_list_attachment(self):
+        ''' * /pages/563954/attachments.json => /default/pages/563954/attachments/ '''
         url = "/pages/563954/attachments.json"
-        assert_that(self.parse(url), ends_with("/default/563954/attachments/"))
+        assert_that(self.parse(url), ends_with("/default/pages/563954/attachments/"))
 
     def test_get_attachment(self):
+        ''' * /pages/563954/attachments/559756.json => /default/pages/563954/attachments/559756/json '''
         url = "/pages/563954/attachments/559756.json"
-        assert_that(self.parse(url), ends_with("/default/563954/attachments/559756.json"))
+        assert_that(self.parse(url), ends_with("/default/pages/563954/attachments/559756/json"))
 
     def test_download_attachment(self):
+        ''' * /pages/563954/attachments/559756      => /default/pages/563954/attachments/559756/file '''
         url = "/pages/563954/attachments/559756"
-        assert_that(self.parse(url), ends_with("/default/563954/attachments/559756"))
+        assert_that(self.parse(url), ends_with("/default/pages/563954/attachments/559756/file"))
 
 class FormatDirEntriesTestCase(TestCase):
     def setUp(self):    
@@ -207,6 +207,7 @@ class RequestGetTestCase(TestCase):
 
 
 class MergeTestCase(unittest.TestCase):
+    ''' perform actual merge test on temporal directory '''
     SRC_DIR  = os.path.join(os.path.dirname(__file__), 'tmp', 'src')
     DEST_DIR = os.path.join(os.path.dirname(__file__), 'tmp', 'dest')
     SRC_CONTENT  = "SRC"
@@ -221,9 +222,11 @@ class MergeTestCase(unittest.TestCase):
     def tearDown(self):
         dir = os.path.join(os.path.dirname(__file__), 'tmp')
         for root, dirs, files in os.walk(dir, topdown=False):
-            for name in files:  os.remove(os.path.join(root, name))
-            for name in dirs:   os.rmdir(os.path.join(root, name))
-        os.rmdir('tmp')
+            for name in files:  
+                os.remove(os.path.join(root, name))
+            for name in dirs:   
+                os.rmdir(os.path.join(root, name))
+        os.rmdir(dir)
 
     def run_command(self):
         filesystem_service.merge_dir(self.SRC_DIR, self.DEST_DIR)
@@ -236,8 +239,10 @@ class MergeTestCase(unittest.TestCase):
             f = open(fullpath, 'w')
             f.write(content or "TEST")
             f.close()
-    def src_create(self, path):   return self.create(self.SRC_DIR,  path, self.SRC_CONTENT)
-    def dest_create(self, path):  return self.create(self.DEST_DIR, path, self.DEST_CONTENT)
+    def src_create(self, path):   
+        return self.create(self.SRC_DIR,  path, self.SRC_CONTENT)
+    def dest_create(self, path):  
+        return self.create(self.DEST_DIR, path, self.DEST_CONTENT)
 
     def dest_has(self, path):
         fullpath = os.path.join(self.DEST_DIR, path)
