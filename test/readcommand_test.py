@@ -9,12 +9,13 @@ from hamcrest import *
 from mocktest import *
 import sys, os; sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
 import types
+from global_options_test import OptionTestCase
 
 # springcl
 import springcl, springcl_commands
-from springcl_commands.read_command import ReadCommand, ReadOption
+from springcl_commands.read_command import ReadCommand, simple_options
 from springcl_commands import Errors as error
-from springcl import springnote
+import springnote
 
 # services
 from filesystem_service import FileSystemService, FileNotExist
@@ -66,48 +67,6 @@ default_options = {
 }
 
 class StopTesting(Exception): pass
-
-class OptionTestCase(TestCase):
-    def get_options(self, opt_list):
-        if isinstance(opt_list, types.StringTypes):
-            opt_list = opt_list.split()
-        #opt_list.append("563954")
-
-        return ReadCommand(opt_list).options
-
-class LocalRemoteOptionTestCase(OptionTestCase):
-    def test_remote_option_sets__run_remote__and__run_local_on_fail__to_true(self):
-        options = self.get_options("--remote 123")
-        # verify
-        assert_that(options.run_remote       ,  is_(True))
-        assert_that(options.run_local_on_fail,  is_(True))
-        assert_that(options.run_local         , is_(False))
-        assert_that(options.run_remote_on_fail, is_(False))
-
-    def test_local_option_sets__run_local__to_true(self):
-        options = self.get_options("--local 123")
-        #
-        assert_that(options.run_local         , is_(True))
-        assert_that(options.run_remote_on_fail, is_(True))
-        assert_that(options.run_remote       , is_(False))
-        assert_that(options.run_local_on_fail, is_(False))
-
-    def test_remote_only_option_runs_only_remote_first(self):
-        options = self.get_options("--remote-only 123")
-        # verify
-        assert_that(options.run_remote       , is_(True))
-        assert_that(options.run_local_on_fail, is_(False))
-        assert_that(options.run_local         , is_(False))
-        assert_that(options.run_remote_on_fail, is_(False))
-
-    def test_local_only_option_runs_only_remote_first(self):
-        options = self.get_options("--local-only 123")
-        # verify
-        assert_that(options.run_local         , is_(True))
-        assert_that(options.run_remote_on_fail, is_(False))
-        assert_that(options.run_remote       ,  is_(False))
-        assert_that(options.run_local_on_fail,  is_(False))
-
 
 class TitleIdOptionTestCase(OptionTestCase):
     def test_title_option_force_is__title_to_true(self):
@@ -430,7 +389,8 @@ class FetchPageWithRevisionTestCase(TestCase):
         options.update(args=[])
         options.update(new_options)
         option_mock = mock('option').with_children(**options).raw
-        mock_on(ReadOption).parse.is_expected.returning(option_mock)
+        #mock_on(ReadOption).parse.is_expected.returning(option_mock)
+        mock_on(simple_options).parse.is_expected.returning(option_mock)
 
     def stub_format(self, text='RAW'):
         mock_on(ReadCommand).format.returning(text)
@@ -462,7 +422,7 @@ class FetchPageWithRevisionTestCase(TestCase):
 
         self.run_command()
 
-
+    @unittest.testonly
     def test_minus_signed_rev_option_fetches_page_revision_with_index(self):
         id, rev_idx = (123, '-2')
         # 
@@ -501,11 +461,14 @@ class AuthRemoteTestCase(TestCase):
         options = default_options.copy()
         options.update(new_options)
         option_mock = mock('option').with_children(**options).raw
-        mock_on(ReadOption).parse.is_expected.returning(option_mock)
+        #mock_on(ReadOption).parse.is_expected.returning(option_mock)
+        mock_on(simple_options).parse.is_expected.returning(option_mock)
+
 
     def run_command(self):
         ReadCommand(['123']).run()
 
+    @unittest.testonly
     def test_use_access_token_when_calling_remote(self):
         access_token = ('ACCESS', 'TOKEN')
 
@@ -532,8 +495,8 @@ class AuthRemoteTestCase(TestCase):
 
         # mock
         self.stub_parse(consumer=consumer_token)
-        OAuthRequest = springnote.oauth.OAuthRequest
-        mock_on(OAuthRequest).from_consumer_and_token.is_expected  \
+        mock_on(springnote.oauth.OAuthRequest) \
+            .from_consumer_and_token.is_expected  \
             .where_(consumer_token_is_used).raising(StopTesting)
 
         # run
@@ -541,7 +504,11 @@ class AuthRemoteTestCase(TestCase):
         self.assertRaises(StopTesting, lambda: self.run_command())
 
 class UpdateRemoteResourceTestCase(TestCase):
-    pass
+    def test_exits_when_cannot_connect_to_remote(self):
+        pass
+
+    def test_exits_when_cannot_fetch_from_remote(self):
+        pass
 
 
 if __name__ == '__main__':

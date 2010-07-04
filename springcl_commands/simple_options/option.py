@@ -239,19 +239,22 @@ class GroupOption(BaseOption):
         parser.add_option_group(option_group)
 
 
+
 class Parser:
-    def __init__(self, usage='', options=None):
+    def __init__(self, usage='', options=None, defaults={}):
         self.usage = usage.strip()
         options = options.strip()
-        self.options = [Option.build(opt_str) for opt_str in options.split("\n")]
+        self.options  = [Option.build(opt_str) for opt_str in options.split("\n")]
+        self.defaults = defaults
 
     def _build(self):
         ''' bulids option parser '''
-        parser   = optparse.OptionParser(usage=self.usage)
-        is_valid = lambda x: x is not None
-
+        parser = optparse.OptionParser(usage=self.usage)
         for option in self.options:
             option.add_option(parser)
+
+        if self.defaults:
+            parser.set_defaults(**self.defaults)
 
         return parser
 

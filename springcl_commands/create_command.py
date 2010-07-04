@@ -1,6 +1,14 @@
 #!/usr/bin/python
-from springcl_commands import *
-import simple_options
+from __future__ import with_statement
+
+import env
+from util import *
+from springcl_commands import SpringclCommand
+import fs
+
+import springnote
+
+logger = get_logger(__file__)
 
 class CreateCommand(SpringclCommand):
     usage = '''
@@ -15,7 +23,7 @@ class CreateCommand(SpringclCommand):
         [Global Options]
     '''
     def __init__(self, opt_list=[]):
-        self.options = simple_options.parse(self.usage, self.options, opt_list)
+        self.options = self.parse(opt_list)
         if self.options.file is None:
             raise optparse.OptionValueError("should give file to create")
 
@@ -31,38 +39,33 @@ class CreatePageCommand(SpringclCommand):
         springcl create-page [OPTIONS] --file FILE
     '''
     options = '''
-        --file FILE						: resource file
+        --file FILE                     : resource file
         --parent ID  => parent_id<int>  : parent page id. default to root
         
         [Global Options]
     '''
     def __init__(self, opt_list=[], options=None):
-        if options:
-            self.options = options
-        else:
-            self.options = simple_options.parse(self.usage, self.options, opt_list)
-            if self.options.file is None:
-                raise optparse.OptionValueError("should give file to create")
+        if options: self.options = options
+        else:       self.options = self.parse(opt_list)
+        if self.options.file is None:
+            raise Exception("should give file to create")
 
     def request(self, sn):
-        options = self.options
-        parent_id = options.parent_id
+        parent_id = self.options.parent_id
+        content   = fs.read_file(self.options.file)
 
-        f = open(options.file)
-        content = f.read()
-        f.close()
-
+        # set page
         page = springnote.Page.from_json(content, sn)
         page.id   = None
-        page.note = options.note
+        page.note = self.options.note
         page.relation_is_part_of = int(parent_id) if parent_id else None
-
         # save!
-        return page.save()
+        return page.save(verbose=None)
 
     def run(self):
-        result = self.try_fetch(self.request, self.options)
+        result = self.try_fetch(self.request)
         self.write(self.format(result.raw), self.options.output)
+
         return result
 
 
@@ -80,7 +83,7 @@ class CreateAttachmentCommand(SpringclCommand):
         if options:
             self.options = options
         else:
-            self.options = simple_options.parse(self.usage, self.options, opt_list)
+            self.options = self.parse(opt_list)
             if self.options.file is None:
                 raise optparse.OptionValueError("should give file to create")
 

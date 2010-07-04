@@ -15,7 +15,7 @@ class DeleteCommand(SpringclCommand):
         [Global Options]
     '''
     def __init__(self, opt_list=[]):
-        self.options = simple_options.parser(self.usage, self.options, opt_list)
+        self.options = self.parse(opt_list)
         if len(self.options.args) is 0:
             raise Errors.OptionError('needs resource argument')
 
@@ -27,32 +27,29 @@ class DeleteCommand(SpringclCommand):
         return cmd(self.options).run()
 
 
-
 class DeletePageCommand(SpringclCommand):
-    usage = '''
-        springcl delete-page [OPTIONS] RESOURCE
-    '''
+    usage   = 'springcl delete-page [OPTIONS] RESOURCE'
     options = '''
         [Global Options]
     '''
     def __init__(self, opt_list=[]):
-        self.options = simple_options.parse(self.usage, self.options, opt_list)
+        self.options = self.parse(opt_list)
         if len(self.options.args) is 0:
             raise Errors.OptionError('needs resource argument')
 
     def request(self, sn):
         note = self.options.note
-        resource_id = int(self.options.args[0])
+        resource_id = self.options.args[0]
+        resource_id = int(resource_id)
 
         page = springnote.Page(sn, id=resource_id, note=note)
         return page.delete()
 
     def run(self):
-        result = self.try_fetch(self.request, self.options)
+        result = self.try_fetch(self.request)
         self.write(self.format(result.raw), self.options.output)
 
         return result
-
 
 
 class DeleteAttachmentCommand(SpringclCommand):

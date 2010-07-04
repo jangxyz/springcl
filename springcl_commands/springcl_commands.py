@@ -1,5 +1,14 @@
+import env
 import springnote, filesystem_service
+from util import *
+from config import *
+
+config = Config().load()
+logger = get_logger(__file__, level='info')
+
 import os, sys
+import logging
+import simple_options
 
 CONSUMER_TOKEN  = '5aUy7Iz0Rf7RHFflaY2kNQ'
 CONSUMER_SECRET = 'oOTGX5p8v0bmPa2csaprPTbrpbSmEC17Yscn88sSJg'
@@ -187,29 +196,47 @@ def modulename2classname(name):
 
 def make_sn(auth, consumer=None):
     consumer = consumer or (CONSUMER_TOKEN, CONSUMER_SECRET)
-    sn = springnote.Springnote(consumer_token=consumer)
-    if auth:
-        sn.set_access_token(auth)
+    if ':' in auth:
+        auth = auth.split(':')
+    sn = springnote.Springnote(access_token=auth, consumer_token=consumer)
+    #if auth:
+    #    sn.set_access_token(auth)
     return sn
 
 class SpringclCommand(object):
     _sn = None
-    _remote_service = springnote.HttpRequestService()
+    _remote_service = springnote.HttpRequestService
+    _local_service  = filesystem_service.FileSystemService('~/.springcl')
 
-    def sn(self, options, service=None):
+    @classmethod
+    def parse(cls, arg_list=[], options=None, usage=None):
+        ''' read `usage` and `options` from class and build simple_option parser 
+        use configuration file as default value '''
+        assert 'usage' in vars(cls) and 'options' in vars(cls)
+        parser = simple_options.Parser(cls.usage, cls.options, 
+            defaults=config.to_dict())
+        options = parser.parse(arg_list)
+        logger.debug(options)
+        return options
+
+    @classmethod
+    def option_names(cls):
+        ''' return list of names of options for the class '''
+        options = cls.parse()
+        return options.__dict__.keys()
+
+    def sn(self, options, service=None, run_local=None):
         ''' return proper sn, according to options and service given '''
         options = options or self.options
-        self._sn = self._sn or make_sn(options.auth, options.consumer)
+        if run_local is None:
+            run_local = options.run_local
 
-        new_service = self._remote_service 
-        service = service or new_service
-        if isinstance(service, filesystem_service.FileSystemService) and options.basedir:
-            service.base_dir = options.basedir
+        # make sn
+        sn = make_sn(options.auth.split(':'), options.consumer.split(':'))
+        if run_local:
+            sn.service = filesystem_service.FileSystemService(options.basedir)
 
-        # update service of sn 
-        self._sn.service = service
-
-        return self._sn
+        return sn
 
     def last_ran_service_was_remote(self):
         return isinstance(self._sn.service, springnote.HttpRequestService)
@@ -218,41 +245,40 @@ class SpringclCommand(object):
         return text
     
     def write(self, text, output):
-        f = sys.stdout if output is None else open(output, 'a')
+        f = sys.stdout if output is None else open(output, 'w')
         f.write(text)
         f.write("\n")
         if output:
             f.close()
 
-    def find_page_id(self, arg, options):
-        ''' find resource id from given arg and options 
-
-        * options.is_id   : arg is resource id (should be int)
-        * options.is_title: arg is title, so list pages and find out the id of 
-                            the titled page (error if none or more than one)
-        * neither         : id if numeric, title if not
-        '''
-        if not options.is_title:
-            # try parsing it as id first
-            try:
-                resource_id = int(arg)
-            except ValueError:
-                if options.is_id:
-                    raise Errors.OptionError("%s is not an id" % arg)
-                options.is_title = True
-
-        if options.is_title:
-            # find single resource titled `arg`
-            sn    = self.sn(options)
-            pages = springnote.Page.list(sn, note=options.note, title=arg)
-            if   len(pages) == 0: raise Errors.NoSuchResource("no page found with title '%s'. try `list` command" % arg)
-            elif len(pages) >  1: raise Errors.DuplicateResources("more than one pages found with title '%s'. try `list` command" % arg)
-            resource_id = pages[0].id
-        return resource_id
-
-    def try_fetch(self, fetch_method, options):
+    def try_fetch(self, fetch_method, options={}, run_local=None):
         ''' try fetching resource from local, remote, or both, following options '''
-        sn     = self.sn(options)
-        result = fetch_method(sn)
-        return result
+        options   = options or self.options
+        run_local = options.run_local if run_local is None else run_local
 
+        try:
+            sn = self.sn(options, run_local=run_local)
+            result = fetch_method(sn)
+            # save whether fetched from remote on success
+            self.fetched_from_remote = sn.service is springnote.HttpRequestService
+            return result
+        except Exception, e:
+            next_run_local = None
+            # local --> remote
+            if run_local and options.run_remote_on_fail:
+                next_run_local = False
+            # remote --> local
+            if not run_local and options.run_local_on_fail:
+                next_run_local = True
+
+            fetch_mode = lambda run_local: 'local' if run_local else 'remote'
+
+            logger.info('%s failed' % fetch_mode(run_local))
+            if next_run_local is not None:
+                logger.info('trying %s' % fetch_mode(next_run_local))
+                return self.try_fetch(fetch_method, run_local=next_run_local)
+            else:
+                raise e
+
+if __name__ == '__main__':
+    pass

@@ -1,7 +1,11 @@
 #!/usr/bin/python
 
-from springcl_commands import *
-import simple_options
+import env
+from util import *
+
+from springcl_commands import SpringclCommand
+from read_page_command import ReadPageCommand
+from read_attachment_command import ReadAttachmentCommand
 
 class ReadCommand(SpringclCommand):
     usage = '''
@@ -17,99 +21,15 @@ class ReadCommand(SpringclCommand):
         [Global Options]
     '''
     def __init__(self, opt_list=[]):
-        self.options = simple_options.parse(self.usage, self.options, opt_list)
+        self.options = self.parse(opt_list)
         if len(self.options.args) is 0:
             raise Errors.OptionError('needs resource argument')
 
     def run(self):
         ''' figure out proper subcommand and delegate to it '''
         options = self.options
-        if   options.parent_id: cmd = ReadAttachmentCommand(options)
-        else:                   cmd = ReadPageCommand(options)
+        if options.parent_id: cmd = ReadAttachmentCommand
+        else:                 cmd = ReadPageCommand
 
-        return cmd.run()
-
-
-def init_command(self, opt_list, options):
-    if options: 
-        self.options = options
-    else:
-        self.options = simple_options.parse(self.usage, self.options, opt_list)
-        #if self.options.file is None:
-        #    raise Errors.OptionError('needs resource argument')
-
-class ReadPageCommand(SpringclCommand):
-    usage = '''
-        springcl read-page [OPTIONS] RESOURCE
-        springcl read-page [OPTIONS] RESOURCE --rev ID
-    '''
-    options = '''
-        --rev ID<int> : revision of page. plain number is exact identifier and numbers starting with + or - is the index
-
-        [Global Options]
-    '''
-    def __init__(self, opt_list=[], options=None):
-        init_command(self, opt_list, options)
-
-    def fetch(self, sn, note, id, rev=None):
-        page = springnote.Page(sn, note=note, id=id).get()
-        if rev:
-            if rev[0] in ('-', '+'):    key = 'index'
-            else:                       key = 'id'
-            page = page.get_revision(**{key: int(rev)})
-        return page
-
-    def run(self):
-        ''' fetch a page with specific id, note and revision, with options '''
-        options = self.options
-
-        # fetch
-        page_id = int(options.args[0])
-        fetch   = lambda sn: self.fetch(sn, options.note, page_id, options.rev)
-        result  = self.try_fetch(fetch_method=fetch, options=options)
-
-        # read
-        self.write(self.format(result.raw), options.output)
-        return result
-
-
-class ReadAttachmentCommand(SpringclCommand):
-    usage = '''
-        springcl read-attachment [OPTIONS] RESOURCE --parent ID
-        springcl read-attachment [OPTIONS] RESOURCE --parent ID --download
-    ''' 
-    options = '''
-        --parent ID => parent_id<int> : parent page id
-        --download  => is_file[False] : content of attachment
-
-        [Global Options]
-    '''
-    def __init__(self, opt_list=[], options=None):
-        init_command(self, opt_list, options)
-
-    def fetch(self, sn, note, page_id, attachment_id, is_file):
-        assert attachment_id
-
-        page = springnote.Page(sn, note=note, id=page_id)
-        attach = springnote.Attachment(page, id=attachment_id)
-        
-        if is_file: attach.download()
-        else:       attach.get()
-        return attach
-
-    def run(self):
-        ''' fetch an attachment with specific id, note and page_id, with options '''
-        options   = self.options
-
-        # fetch
-        page_id   = options.parent_id
-        attach_id = int(options.args[0])
-
-        fetch  = lambda sn: self.fetch(sn, options.note, page_id, attach_id, options.is_file)
-        result = self.try_fetch(fetch_method=fetch, options=options)
-
-        # read
-        self.write(self.format(result.raw), options.output)
-
-        return result
+        return cmd(options=options).run()
 

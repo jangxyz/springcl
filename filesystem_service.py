@@ -9,6 +9,9 @@
 
 """
 import urllib, httplib, os
+import fs
+from util import *
+logger = get_logger(__file__)
 
 DEFAULT_NOTE_DIRNAME = 'default'
 
@@ -23,8 +26,14 @@ class Service:
 class FileSystemService(Service):
     ''' has request(), status, read() '''
     def __init__(self, base_dir):
-        self.base_dir = base_dir
+        self.base_dir = self.set_base_dir(base_dir)
+
         self.filepath = None
+
+    def set_base_dir(self, base_dir):
+        self.base_dir = os.path.abspath(os.path.expanduser(os.path.expandvars(base_dir)))
+        return self.base_dir
+
 
     @staticmethod
     def query_dict(query):
@@ -108,17 +117,53 @@ class FileSystemService(Service):
 
     def request(self, method, url, body=None, verbose=None, **kwarg):
         ''' request resource to local file system, returning in json format '''
-        if "GET" == method:
+        if method == "GET":
+            # path to read file
             self.filepath = self.parse_url(url)
-            # udpate status
-            if os.path.exists(self.filepath):   self.status = httplib.OK
-            else:                               self.status = httplib.NOT_FOUND
 
+            # udpate status
+            file_found = os.path.exists(self.filepath)
+            self.status = httplib.OK if file_found else httplib.NOT_FOUND
             return self
 
-        else: raise NotImplementedError("not yet")
+        elif method == "POST":
+            return self.post_page(method, url, body, verbose, **kwarg)
+
+        else: 
+            raise NotImplementedError("not yet")
+
+    def post_page(self, method, url, body=None, verbose=None, **kwarg):
+        ''' create a page file to UNBORN directory '''
+
+        # page attributes
+        import springnote
+        page  = springnote.json.loads(body)['page']
+        title, parent_id = page['title'], str(page.get('relation_is_part_of', ''))
+        filename = "_".join([parent_id, title])
+
+        # path
+        note_path = self.parse_url(url)
+        self.filepath = fs.label.get_unborn_path(note_path, filename)
+        fs.ensure_directory(os.path.dirname(self.filepath))
+        # you cannot have page with same (parent_id, title)
+        if os.path.exists(self.filepath):
+            error_msg  = "there already is an unborn page titled '%(title)s' under " % locals()
+            error_msg += "page %(parent_id)s" if parent_id else "root page"
+            error_msg += " at " + self.filepath
+
+            logger.error(error_msg)
+            raise Exception(error_msg)
+        # TODO: check cache too!
+
+        # 
+        fs.write_file(self.filepath, body)
+        # 
+        self.status = httplib.OK
+
+        return self
 
     def read(self):
+        ''' substitue for response = service.request(); response.read() '''
         assert self.filepath, "should run after request()"
         if not os.path.exists(self.filepath):
             raise FileNotExist("%s does not exist" % self.filepath)
@@ -183,7 +228,6 @@ def merge_file(src, dest, output=None):
     # XXX: might have error on windows!
     os.rename(src, dest)
 
-
 def merge_dir(src, dest):
     ''' merge directories src and dest, choosing the newer if same file exists 
     src is REMOVED. 
@@ -204,6 +248,7 @@ def merge_dir(src, dest):
 
     # REMOVE src
     os.rmdir(src)
+
 
 if __name__ == '__main__':
     pass

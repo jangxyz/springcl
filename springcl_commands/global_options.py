@@ -34,7 +34,7 @@ class GlobalOptions:
     def _build_parser(cls, parser=None):
         parser = parser or optparse.OptionParser()
 
-        parser.add_option('--basedir', metavar="PATH", default=config['home'], dest="basedir", help='use PATH as local cache basedir')
+        parser.add_option('--basedir', metavar="PATH", default=None, dest="basedir", help='use PATH as local cache basedir')
         parser.add_option('--output', metavar="FILE", default=None, help='output file')
         #
         parser.add_option('--note', metavar='NOTE', help='specify note name to delete resource on')
@@ -84,8 +84,13 @@ def handle_local_remote(option, opt_str, value, parser, *args, **kwargs):
     mapping['--local' ] = mapping['--local'  + suffix]
     mapping['--remote'] = mapping['--remote' + suffix]
 
+    # set True
     for attr in mapping[opt_str]:
         setattr(parser.values, attr, True)
+    # set False
+    false_options = filter(lambda opt: opt not in mapping[opt_str], set(reduce(lambda x,y: x+y, mapping.values())))
+    for attr in false_options :
+        setattr(parser.values, attr, False)
 
     # check duplicate
     if parser.values.run_remote and parser.values.run_local:
