@@ -27,7 +27,12 @@ def camel2sentence(camel):
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        sys.exit(command_dict.keys())
+        commands = [cmd_name for cmd_name in command_dict if '-' not in cmd_name]
+        print 'commands:', ", ".join(commands)
+        commands = [cmd_name for cmd_name in command_dict if '-' in cmd_name]
+        print 'more commands:', ", ".join(commands)
+        sys.exit()
+
     try:
         cmd = command_dict.get(sys.argv[1], None)
         if cmd is not None:

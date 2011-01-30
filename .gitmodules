@@ -1,0 +1,3 @@
+[submodule "springnote"]
+	path = springnote
+	url = git@github.com:jangxyz/springnote.py-with-oauth.git

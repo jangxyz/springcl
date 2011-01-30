@@ -1,5 +1,6 @@
 #!/usr/bin/python
         
+# add this directory and parent to sys.path
 import os, sys, inspect
 dirname = os.path.dirname(__file__)
 sys.path.append( dirname + '/..' )

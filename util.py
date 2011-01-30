@@ -1,5 +1,11 @@
 #!/usr/bin/python
 
+'''
+
+    module holding bunch of utility functions
+
+'''
+
 __all__ = [
     '_w', 'get_logger', 'empty',
     'L', 'D', 'ValueNotGiven', 
